@@ -1,32 +1,10 @@
-# C++ objects and libs
-
-*.slo
-*.lo
-*.o
-*.a
-*.la
-*.lai
-*.so
-*.dll
-*.dylib
-
-# Qt-es
-
-/.qmake.cache
-/.qmake.stash
-*.pro.user
-*.pro.user.*
-*.moc
-moc_*.cpp
-qrc_*.cpp
-ui_*.h
+/!archive
+/build
+/build-static
+/3rdparty/hoedown
 Makefile*
-*-build-*
-
-# QtCreator
-
-*.autosave
-
-#QtCtreator Qml
-*.qmlproject.user
-*.qmlproject.user.*
+*.user
+*.bat
+*_plugin_import.cpp
+*.sqlite
+*.sqlite.*
