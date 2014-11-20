@@ -4,9 +4,11 @@ char101/Outliner
 ## Overview
 
 * Data is stored in a sqlite database
-* Portable
-* Can zoom/unzoom specific item (make the item root of the outline)
+* Portable, can be built statically as a single executable
+* Theoretically cross-platform
+* Can zoom/unzoom specific item (set a specific item as the root of the outline) - with breadcrumb navigation
 * Optional checkbox for each item
+* Highlight a specific item (e.g. for marking currently executed task)
 * Each item is rendered using markdown (with [hoedown](https://github.com/hoedown/hoedown))
 
 ![Screnshot](http://char101.github.io/outliner/images/screenshot.png)
@@ -56,3 +58,8 @@ char101/Outliner
   Moves the cursor to an item in the same column of the last row of the last top-level item in the model.
 * `F2`  
   In editable models, this opens the current item for editing. The Escape key can be used to cancel the editing process and revert any changes to the data displayed.
+
+## Future Plan
+
+* Schedule view - shows the list of task for each day based on the date set in the outline
+* Timer view - similar to a pomodoro timer for currently executed task
