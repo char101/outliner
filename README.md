@@ -1,6 +1,8 @@
 char101/Outliner
 ================
 
+Project status: alpha | Usable: yes | Bugs: most likely
+
 ## Overview
 
 * Data is stored in a sqlite database
