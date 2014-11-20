@@ -7,6 +7,7 @@ char101/Outliner
 * Portable
 * Can zoom/unzoom specific item (make the item root of the outline)
 * Optional checkbox for each item
+* Each item is rendered using markdown (with [hoedown](https://github.com/hoedown/hoedown))
 
 ![Screnshot](http://char101.github.io/outliner/images/screenshot.png)
 
