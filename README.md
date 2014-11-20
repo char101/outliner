@@ -5,6 +5,8 @@ Yet another outliner
 
 * Written C++ + [Qt framework](http://www.qt.io/)
 
+![Screnshot](http://char101.github.io/outliner/images/screenshot.png)
+
 Keyboard shortcuts
 
 * `Z` zoom
