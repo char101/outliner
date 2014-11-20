@@ -19,6 +19,12 @@ Keyboard shortcuts
 * `ctrl+insert` append child
 * `ctrl+up/ctrl+down` move item up/down
 * `ctrl+left/ctrl-right` move item left/right
+* `F2/Enter` Edit item
+
+Mouse binding
+
+* Double click  
+  On leaf node it will open the editor, otherwise zoom to the item
 
 Standard QTreeView key bindings
 
