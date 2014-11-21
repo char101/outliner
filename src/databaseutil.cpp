@@ -3,6 +3,8 @@
 
 #include <QDebug>
 #include <QFile>
+#include <QFileInfo>
+#include <QDir>
 
 DatabaseUtil::DatabaseUtil(const QString& dbPath): dbPath(dbPath), failed(false)
 {
@@ -65,7 +67,13 @@ void DatabaseUtil::backup()
     if (failed)
         return;
 
-    QString newPath = QString("%0.%1").arg(dbPath).arg(version());
+    QFileInfo dbPathInfo(dbPath);
+
+    QDir dbDir = dbPathInfo.dir();
+    dbDir.mkdir("backup");
+    QDir backupDir = dbDir.filePath("backup");
+
+    QString newPath = QString("%0.%1").arg(backupDir.filePath(dbPathInfo.baseName())).arg(version());
     if (QFile(newPath).exists())
         return;
 
