@@ -15,6 +15,8 @@ Project status: alpha | Usable: yes | Bugs: most likely
 
 ![Screnshot](http://char101.github.io/outliner/images/screenshot.png)
 
+## [Downloads](https://github.com/char101/outliner/releases/)
+
 ## Keyboard Bindings
 
 * `Z` zoom
