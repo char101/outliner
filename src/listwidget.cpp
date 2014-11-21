@@ -35,7 +35,7 @@ void ListWidget::loadLists()
         auto breadcrumb = new Breadcrumb(this);
         breadcrumb->setVisible(false);
 
-        connect(tree, &ListTree::zoomed, [breadcrumb, tree](ListItem* item) {
+        connect(tree, &ListTree::zoomed, [this, breadcrumb, tree](ListItem* item) {
             // collect all items from this item to the root
             QList<ListItem*> items;
             for (ListItem* curr = item; curr; curr = curr->parent())
@@ -45,7 +45,7 @@ void ListWidget::loadLists()
 
             // root item
             QAction* action = breadcrumb->addAction("Top");
-            connect(action, &QAction::triggered, [=]() {
+            connect(action, &QAction::triggered, [this, tree]() {
                 tree->unzoomAll();
             });
             breadcrumb->addSeparator();
@@ -55,7 +55,7 @@ void ListWidget::loadLists()
                 QAction* action = breadcrumb->addAction(items[i]->label());
                 if (i > 0)
                     breadcrumb->addSeparator();
-                connect(action, &QAction::triggered, [=]() {
+                connect(action, &QAction::triggered, [this, tree, items, i]() {
                     tree->unzoomTo(items[i]->model()->indexFromItem(items[i]));
                 });
             }
