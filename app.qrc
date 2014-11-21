@@ -1,10 +1,7 @@
-<!DOCTYPE RCC><RCC version="1.0">
-<qresource>
-  <file alias="app.png">res/app256.png</file>
-  <file alias="calendar.png">res/calendar.png</file>
-  <file alias="timer.png">res/timer.png</file>
-  <file alias="list.png">res/list.png</file>
-  <file alias="add.png">res/small-n-flat/add.png</file>
-  <file alias="chevron-right-16.png">res/material/chevron-right-16.png</file>
-</qresource>
+<!DOCTYPE RCC>
+<RCC version="1.0">
+ <qresource>
+   <file alias="app.png">res/app.png</file>
+   <file alias="list.png">res/list.png</file>
+ </qresource>
 </RCC>
