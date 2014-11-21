@@ -180,8 +180,10 @@ void ListTree::appendItem(bool asChild)
     QModelIndex idx = currentIndex();
     if (asChild) {
         auto childIndex = model->appendChild(idx, text);
-        setExpanded(idx, true);
-        setCurrentIndex(childIndex);
+        if (childIndex.isValid()) {
+            setExpanded(idx, true);
+            setCurrentIndex(childIndex);
+        }
     } else {
         QModelIndex newIndex = model->appendAfter(idx, text);
         setCurrentIndex(newIndex);

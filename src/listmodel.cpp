@@ -79,14 +79,18 @@ QModelIndex ListModel::appendAfter(const QModelIndex& index, QString text)
 
 QModelIndex ListModel::appendChild(const QModelIndex& index, QString text)
 {
+    if (!index.isValid())
+        return QModelIndex();
+    QStandardItem* parent = itemFromIndex(index);
+    if (!parent)
+        return QModelIndex();
+
     QList<QStandardItem*> items;
     auto item = new ListItem();
     item->setMarkdown(text);
     items << item;
 
-    QStandardItem* parent = itemFromIndex(index);
-    parent->insertRow(item->rowCount(), items);
-
+    parent->insertRow(parent->rowCount(), items);
     return indexFromItem(item);
 }
 
