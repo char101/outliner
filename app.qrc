@@ -1,7 +1,0 @@
-<!DOCTYPE RCC>
-<RCC version="1.0">
- <qresource>
-   <file alias="app.png">res/app.png</file>
-   <file alias="list.png">res/list.png</file>
- </qresource>
-</RCC>
