@@ -2,6 +2,7 @@
 /build
 /build-static
 /3rdparty/hoedown
+/gh-pages
 Makefile*
 *.user
 *.bat

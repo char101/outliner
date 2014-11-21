@@ -42,7 +42,6 @@ int main(int argc, char *argv[])
     dbUtil.initialize();
 
     MainWindow win;
-    win.setWindowIcon(QIcon(":/app.png"));
     win.setDatabasePath(dbPath);
     win.show();
     return app.exec();

@@ -17,6 +17,7 @@ MainWindow::MainWindow() : QMainWindow()
     statusBarVisible = false;
 
     setWindowTitle("Outliner");
+    setWindowIcon(QIcon(":app.png"));
 
     setupMenu();
     setupStatusBar();

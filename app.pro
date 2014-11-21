@@ -2,8 +2,8 @@ TEMPLATE = app
 TARGET = outliner
 INCLUDEPATH += . 3rdparty/hoedown/src
 CONFIG += windows c++11
-RC_FILE = app.rc
-RESOURCES = app.qrc
+RC_FILE = res/app.rc
+RESOURCES = res/app.qrc
 DEFINES += _CRT_SECURE_NO_WARNINGS
 
 QT += widgets sql

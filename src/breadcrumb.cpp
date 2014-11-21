@@ -7,6 +7,7 @@
 Breadcrumb::Breadcrumb(QWidget* parent) : QToolBar(parent)
 {
     setStyleSheet("QToolButton { color:steelblue }");
+    setIconSize(QSize(16, 16));
 }
 
 QAction* Breadcrumb::addAction(const QString& text)
@@ -18,19 +19,17 @@ QAction* Breadcrumb::addAction(const QString& text)
     return action;
 }
 
+QAction* Breadcrumb::addAction(const QIcon& icon, const QString& text)
+{
+    return QToolBar::addAction(icon, text);
+}
+
 void Breadcrumb::addCurrent(const QString& text)
 {
     setVisible(true);
     auto label = new QLabel(text);
     label->setStyleSheet("margin-left:5px");
     addWidget(label);
-}
-
-void Breadcrumb::addSeparator()
-{
-    auto sep = new QLabel("/");
-    QAction* action = QToolBar::addWidget(sep);
-    action->setDisabled(true); // must be disabled for popAction below
 }
 
 void Breadcrumb::popAction()
