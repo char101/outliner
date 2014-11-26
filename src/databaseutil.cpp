@@ -19,18 +19,28 @@ int DatabaseUtil::version()
     return sql.value(0).toInt();
 }
 
-void DatabaseUtil::setVersion(int value)
+void DatabaseUtil::setVersion(QSqlDatabase *db, int value)
 {
-    if (failed)
+    if (!failed)
+        backup(); // backup previous database version if there is no error in migration
+
+    if (failed) {
+        qDebug() << "Database change version" << value << "rolled back";
+        db->rollback();
         return;
+    }
 
     SqlQuery sql;
     sql.prepare("UPDATE version SET value = :value");
     sql.bindValue(":value", value);
     if (!sql.exec())
         failed = true;
-    else
-        qDebug() << "Database version set to" << value;
+
+    qDebug() << "Database change version" << value << "commited";
+    db->commit();
+
+    // begin next transaction
+    db->transaction();
 }
 
 void DatabaseUtil::runSql(const QString& sql)
@@ -53,27 +63,11 @@ bool DatabaseUtil::tableExists(const QString& name)
     return sql.next();
 }
 
-void DatabaseUtil::initialize()
-{
-    if (!tableExists("version")) {
-        runSql("CREATE TABLE version (value INTEGER NOT NULL)");
-        runSql("INSERT INTO version VALUES (1)");
-    }
-    migrate();
-}
-
 void DatabaseUtil::backup()
 {
-    if (failed)
-        return;
+    QFileInfo info(dbPath);
 
-    QFileInfo dbPathInfo(dbPath);
-
-    QDir dbDir = dbPathInfo.dir();
-    dbDir.mkdir("backup");
-    QDir backupDir = dbDir.filePath("backup");
-
-    QString newPath = QString("%0.%1").arg(backupDir.filePath(dbPathInfo.baseName())).arg(version());
+    QString newPath = QString("%0/%1.v%2.sqlite").arg(info.dir().path()).arg(info.baseName()).arg(version());
     if (QFile(newPath).exists())
         return;
 
@@ -84,12 +78,26 @@ void DatabaseUtil::backup()
     }
 }
 
-void DatabaseUtil::migrate()
+bool DatabaseUtil::initialize()
+{
+    if (!tableExists("version")) {
+        runSql("CREATE TABLE version (value INTEGER NOT NULL)");
+        runSql("INSERT INTO version VALUES (1)");
+        if (failed)
+            return false;
+    }
+    return migrate();
+}
+
+/**
+ * To rename column, create the new column (with _new prefix),
+ * then call migrateTable dropping the old column
+ */
+bool DatabaseUtil::migrate()
 {
     int version = DatabaseUtil::version();
-    qDebug() << "Database version" << version;
 
-    QSqlDatabase db;
+    QSqlDatabase db = QSqlDatabase::database();
     db.transaction();
 
     switch(version) {
@@ -108,7 +116,7 @@ void DatabaseUtil::migrate()
                     "  content TEXT NOT NULL,"
                     "  note TEXT NULL,"
                     "  checkable BOOLEAN DEFAULT 0 NOT NULL,"
-                    "  checked BOOLEAN NULL,"
+                    "  checked INT NULL,"
                     "  checked_at DATETIME NULL,"
                     "  expanded BOOLEAN DEFAULT 0 NOT NULL,"
                     "  weight INTEGER NOT NULL,"
@@ -121,15 +129,111 @@ void DatabaseUtil::migrate()
                 runSql("CREATE INDEX idx_list_item_parent ON list_item (parent_id)");
                 runSql("INSERT INTO list_item (list_id, content, weight) VALUES (1, 'Welcome', 0)");
             }
-            setVersion(2);
+            setVersion(&db, 2);
         case 2:
             backup();
-            runSql("ALTER TABLE list_item ADD highlight int");
-            setVersion(3);
+            runSql("ALTER TABLE list_item ADD highlight INT");
+            setVersion(&db, 3);
+        case 3:
+            addColumn("list_item", "checkstate INTEGER DEFAULT 0 NOT NULL");
+            runSql("UPDATE list_item SET checkstate = 2 WHERE checked = 1"); // handle partially checked state (cancelled)
+            migrateTable("list_item", QStringList("checked"));
+            setVersion(&db, 4);
+        case 4:
+            // remove checkable column, if checkstate is not null then it's checkable
+            addColumn("list_item", "checkstate_new INTEGER");
+            runSql("UPDATE list_item SET checkstate_new = CASE WHEN checkable THEN checkstate ELSE NULL END");
+            migrateTable("list_item", QStringList() << "checkstate" << "checkable");
+            setVersion(&db, 5);
+        case 5:
+            addColumn("list_item",  "is_project INTEGER DEFAULT 0 NOT NULL");
+            setVersion(&db, 6);
     }
 
+    if (!failed)
+        db.commit(); // close the transaction opened by the last setVersion
+
+    return !failed;
+}
+
+void DatabaseUtil::addColumn(const QString& table, const QString& colspec)
+{
+    runSql(QString("ALTER TABLE %0 ADD %1").arg(table).arg(colspec));
+}
+
+void DatabaseUtil::migrateTable(const QString& table, const QStringList& droppedColumns)
+{
     if (failed)
-        db.rollback();
-    else
-        db.commit();
+        return;
+
+    if (!migrateTableInner(table, droppedColumns))
+        failed = true;
+}
+
+// remove droppped columns
+// automatically migrate column_new to column
+bool DatabaseUtil::migrateTableInner(const QString& table, const QStringList& droppedColumns)
+{
+    SqlQuery sql;
+
+    sql.prepare(QString("PRAGMA table_info('%0')").arg(table)); // cannot bind
+    if (!sql.exec())
+        return false;
+
+    QStringList oldColumns;
+    QStringList newColumns;
+    QStringList newColumnsSpec;
+    while (sql.next()) {
+        QString name = sql.value(1).toString();
+
+        if (droppedColumns.contains(name))
+            continue;
+
+        QString newName = name;
+        if (name.endsWith("_new"))
+            newName = name.left(name.length() - 4);
+
+        oldColumns << name;
+        newColumns << newName;
+
+        QString type = sql.value(2).toString();
+        bool notnull = sql.value(3).toBool();
+        QString defVal = sql.value(4).toString();
+        bool isPk = sql.value(5).toBool();
+
+        QStringList colSpec;
+        colSpec << newName << type;
+        if (notnull)
+            colSpec << "NOT NULL";
+        if (!defVal.isEmpty())
+            colSpec << "DEFAULT" << defVal;
+        if (isPk)
+            colSpec << "PRIMARY KEY";
+        newColumnsSpec << colSpec.join(' ');
+    }
+
+    QString newTable = table + "_temp";
+
+    sql.prepare(QString("CREATE TABLE %0 (%1)").arg(newTable).arg(newColumnsSpec.join(',')));
+    if (!sql.exec())
+        return false;
+
+    sql.prepare(QString("INSERT INTO %0 (%1) SELECT %2 FROM %3").
+                arg(newTable).
+                arg(newColumns.join(", ")).
+                arg(oldColumns.join(", ")).
+                arg(table)
+    );
+    if (!sql.exec())
+        return false;
+
+    sql.prepare(QString("DROP TABLE %0").arg(table));
+    if (!sql.exec())
+        return false;
+
+    sql.prepare(QString("ALTER TABLE %0 RENAME TO %1").arg(newTable).arg(table));
+    if (!sql.exec())
+        return false;
+
+    return true;
 }

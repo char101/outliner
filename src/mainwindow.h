@@ -5,6 +5,7 @@
 #include <QTabWidget>
 
 #include "listwidget.h"
+#include "listoutliner.h"
 
 class MainWindow : public QMainWindow
 {
@@ -17,6 +18,7 @@ public:
 private:
     QTabWidget* tabWidget;
     ListWidget* listWidget;
+    ListOutliner* listOutliner;
     bool menuVisible;
     bool statusBarVisible;
     void setupMenu();

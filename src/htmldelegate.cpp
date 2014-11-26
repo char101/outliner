@@ -35,6 +35,7 @@ void HtmlDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option, 
     painter->save();
 
     QTextDocument doc;
+    // doc.setDefaultFont(QFont("Roboto", 9));
     doc.setDefaultStyleSheet("ul { margin-left: -36px; } ol { margin-left: -28px; }");
 
     doc.setHtml(opt.text);

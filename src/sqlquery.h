@@ -8,4 +8,5 @@ public:
     bool exec(const QString& query);
     bool exec();
     bool fetch();
+    void bindValue(const QString& placeholder, const QVariant& val);
 };

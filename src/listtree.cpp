@@ -1,12 +1,16 @@
-#include <QMessageBox>
-#include <QDebug>
-
 #include "listtree.h"
 #include "listitemeditdialog.h"
 #include "listitem.h"
 #include "constants.h"
+#include "utils.h"
 
-ListTree::ListTree(int listId, QWidget* parent) : QTreeView(parent), listId(listId)
+#include <QMessageBox>
+#include <QDebug>
+#include <QAction>
+#include <QFont>
+#include <QMenu>
+
+ListTree::ListTree(int listId, QWidget* parent) : QTreeView(parent), _listId(listId)
 {
     setHeaderHidden(true);
     setAlternatingRowColors(true);
@@ -45,13 +49,27 @@ void ListTree::keyPressEvent(QKeyEvent* event)
             edit(currentIndex());
             return;
         case Qt::Key_Insert:
-            appendItem(modifiers == Qt::ControlModifier);
+            if (modifiers & Qt::ControlModifier)
+                appendItem(App::AppendChild);
+            else if (modifiers & Qt::AltModifier)
+                appendItem(App::AppendBefore);
+            else
+                appendItem(App::AppendAfter);
             return;
         case Qt::Key_Delete:
             remove(currentIndex());
             return;
         case Qt::Key_C: // checkable
             model->toggleItemCheckable(currentIndex());
+            return;
+        case Qt::Key_Space: // toggle checkbox
+            model->toggleItemCheckState(currentIndex(), Qt::Checked);
+            return;
+        case Qt::Key_P: // toggle project
+            model->toggleItemIsProject(currentIndex());
+            return;
+        case Qt::Key_X: // cancel item
+            model->toggleItemCancelled(currentIndex());
             return;
         case Qt::Key_H: // highlight
             model->toggleHighlight(currentIndex());
@@ -86,9 +104,6 @@ void ListTree::keyPressEvent(QKeyEvent* event)
                 return;
             }
             break;
-        case Qt::Key_Space: // toggle checkbox
-            toggleCheckState(currentIndex());
-            return;
     }
     QTreeView::keyPressEvent(event);
 }
@@ -119,6 +134,36 @@ void ListTree::mouseDoubleClickEvent(QMouseEvent* e)
         return;
     }
     QTreeView::mouseDoubleClickEvent(e);
+}
+
+void ListTree::contextMenuEvent(QContextMenuEvent* event)
+{
+    QModelIndexList selection = selectedIndexes();
+    if (selection.isEmpty())
+        return;
+
+    QModelIndex index = selection.first();
+    if (!index.isValid())
+        return;
+
+    ListModel* model = this->model();
+    QStandardItem* item = model->itemFromIndex(index);
+    if (item->rowCount() <= 1)
+        return;
+
+    QMenu menu;
+    QAction* sortCompletedAction = menu.addAction(Util::findIcon("sort"), "Sort completed");
+    QAction* sortAllAction = menu.addAction(Util::findIcon("sort"), "Sort all");
+
+    QAction* action = menu.exec(event->globalPos());
+    if (!action)
+        return;
+
+    if (action == sortAllAction) {
+        model->sortChildren(item);
+    } else if (action == sortCompletedAction) {
+        model->sortCompleted(item);
+    }
 }
 
 void ListTree::moveVertical(int dir)
@@ -165,7 +210,7 @@ void ListTree::moveHorizontal(int dir)
     setCurrentIndex(model->indexFromItem(item));
 }
 
-void ListTree::appendItem(bool asChild)
+void ListTree::appendItem(App::AppendMode mode)
 {
     ListItemEditDialog dialog;
     if (dialog.exec() != QDialog::Accepted)
@@ -174,18 +219,16 @@ void ListTree::appendItem(bool asChild)
     if (text.isEmpty())
         return;
 
-    qDebug() << __FUNCTION__ << "text =" << text;
-
     ListModel* model = this->model();
     QModelIndex idx = currentIndex();
-    if (asChild) {
+    if (mode == App::AppendChild) {
         auto childIndex = model->appendChild(idx, text);
         if (childIndex.isValid()) {
             setExpanded(idx, true);
             setCurrentIndex(childIndex);
         }
     } else {
-        QModelIndex newIndex = model->appendAfter(idx, text);
+        QModelIndex newIndex = model->appendAfter(idx, text, mode);
         setCurrentIndex(newIndex);
     }
 }
@@ -207,11 +250,6 @@ void ListTree::edit(const QModelIndex& index)
     }
 }
 
-void ListTree::toggleCheckState(const QModelIndex& index)
-{
-    model()->toggleItemCheckState(index);
-}
-
 void ListTree::zoom(const QModelIndex& index)
 {
     if (!index.isValid())
@@ -223,6 +261,20 @@ void ListTree::zoom(const QModelIndex& index)
         return;
     setRootIndex(index);
     emit zoomed(static_cast<ListItem*>(item));
+}
+
+void ListTree::zoom(int itemId)
+{
+    // invalid id
+    if (itemId == 0)
+        return;
+
+    QModelIndex index = model()->indexFromId(itemId);
+    // index not found
+    if (!index.isValid())
+        return;
+
+    zoom(index);
 }
 
 void ListTree::unzoom()
@@ -299,4 +351,21 @@ void ListTree::restoreExpandedState(QStandardItem* item)
     for (int i = 0, n = item->rowCount(); i < n; ++i) {
         restoreExpandedState(item->child(i));
     }
+}
+
+void ListTree::scrollTo(int itemId)
+{
+    // invalid id
+    if (itemId == 0)
+        return;
+
+    QModelIndex index = model()->indexFromId(itemId);
+    // index not found
+    if (!index.isValid())
+        return;
+
+    QTreeView::scrollTo(index, QAbstractItemView::PositionAtTop);
+    QItemSelectionModel* selection = selectionModel();
+    selection->clear();
+    selection->select(index, QItemSelectionModel::Select);
 }

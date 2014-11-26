@@ -1,6 +1,7 @@
 /!archive
 /build
 /3rdparty/hoedown
+/icons
 /fonts
 /gh-pages
 Makefile*

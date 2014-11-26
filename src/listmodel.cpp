@@ -11,7 +11,7 @@ ListModel::ListModel(int listId, QObject* parent) : QStandardItemModel(0, 1, par
 {
     setItemPrototype(new ListItem());
 
-    loadItems(invisibleRootItem());
+    _loadItems(invisibleRootItem());
     // setHorizontalHeaderLabels(QStringList() << "Lists");
 
     connect(this, &ListModel::rowsInserted, this, &ListModel::onRowsInserted);
@@ -19,10 +19,10 @@ ListModel::ListModel(int listId, QObject* parent) : QStandardItemModel(0, 1, par
     // connect(this, &ListModel::rowsAboutToBeRemoved, this, &ListModel::onRowsAboutToBeRemoved);
 }
 
-void ListModel::loadItems(QStandardItem* parent, int parentId)
+void ListModel::_loadItems(QStandardItem* parent, int parentId)
 {
     SqlQuery sql;
-    sql.prepare(QString("SELECT id, content, checkable, checked, expanded, highlight FROM list_item WHERE list_id = :list AND parent_id %0 ORDER BY weight ASC").arg(
+    sql.prepare(QString("SELECT id, content, checkstate, expanded, highlight, is_project FROM list_item WHERE list_id = :list AND parent_id %0 ORDER BY weight ASC").arg(
         parentId == 0 ? "IS NULL" : "= :parent"
     ));
     if (parentId)
@@ -32,10 +32,12 @@ void ListModel::loadItems(QStandardItem* parent, int parentId)
     while (sql.next()) {
         int itemId = sql.value(0).toInt();
         QString itemContent = sql.value(1).toString();
-        bool checkable = sql.value(2).toBool();
-        bool checked = sql.value(3).toBool();
-        bool expanded = sql.value(4).toBool();
-        QRgb highlight = sql.value(5).toInt();
+        QVariant checkState = sql.value(2);
+        bool expanded = sql.value(3).toBool();
+        QRgb highlight = sql.value(4).toInt();
+        bool isProject = sql.value(5).toInt();
+
+        bool checkable = !checkState.isNull();
 
         QList<QStandardItem*> items;
         auto item = new ListItem();
@@ -43,38 +45,48 @@ void ListModel::loadItems(QStandardItem* parent, int parentId)
         item->setMarkdown(itemContent);
         if (checkable) {
             item->setCheckable(true);
-            if (checked)
-                item->setData(checked ? Qt::Checked : Qt::Unchecked, Qt::CheckStateRole);
+            item->setData(checkState, Qt::CheckStateRole);
         }
         item->setData(expanded, App::ExpandedStateRole);
         if (highlight) {
             item->setData(QColor(highlight), Qt::BackgroundRole);
         }
+        item->setData(isProject, App::ProjectRole);
+        if (isProject)
+            item->setData(App::ProjectBackgroundColor, Qt::BackgroundRole);
         items << item;
         parent->appendRow(items);
 
-        loadItems(items[0], itemId);
+        _loadItems(items[0], itemId);
     }
 }
 
-QModelIndex ListModel::appendAfter(const QModelIndex& index, QString text)
+QModelIndex ListModel::appendAfter(const QModelIndex& index, QString text, App::AppendMode mode)
 {
-    QStandardItem* refItem = itemFromIndex(index);
+    if (!index.isValid())
+        return QModelIndex();
 
-    QList<QStandardItem*> items;
-    auto item = new ListItem();
-    item->setMarkdown(text);
-    if (refItem->isCheckable())
-        item->setCheckable(true);
-    items << item;
+    QStandardItem* item = itemFromIndex(index);
+    if (!item)
+        return QModelIndex();
 
-    QStandardItem* parent = itemFromIndex(index)->parent();
+    QList<QStandardItem*> newItems;
+    ListItem* newItem = new ListItem();
+    newItem->setMarkdown(text);
+    if (item->isCheckable())
+        newItem->setCheckable(true);
+    newItems << newItem;
+
+    QStandardItem* parent = item->parent();
     if (!parent) {
         parent = invisibleRootItem();
     }
-    parent->insertRow(index.row() + 1, items);
+    if (mode == App::AppendAfter)
+        parent->insertRow(index.row() + 1, newItems);
+    else if (mode == App::AppendBefore)
+        parent->insertRow(index.row(), newItems);
 
-    return indexFromItem(item);
+    return indexFromItem(newItem);
 }
 
 QModelIndex ListModel::appendChild(const QModelIndex& index, QString text)
@@ -128,13 +140,12 @@ void ListModel::onRowsInserted(const QModelIndex& parent, int first, int last)
     for (int i = first; i <= last; ++i) {
         ListItem* childItem = static_cast<ListItem*>(parentItem->child(i));
         SqlQuery sql;
-        sql.prepare("INSERT INTO list_item (list_id, parent_id, content, weight, checkable) VALUES (:list, :parent, :content, :weight, :checkable)");
+        sql.prepare("INSERT INTO list_item (list_id, parent_id, content, weight, checkstate) VALUES (:list, :parent, :content, :weight, :checkstate)");
         sql.bindValue(":list", listId);
         sql.bindValue(":parent", parentId);
         sql.bindValue(":weight", i);
-        qDebug() << __FUNCTION__ << "childItem->markdown() =" << childItem->markdown();
         sql.bindValue(":content", childItem->markdown());
-        sql.bindValue(":checkable", childItem->isCheckable() ? 1 : 0);
+        sql.bindValue(":checkstate", childItem->isCheckable() ? childItem->data(Qt::CheckStateRole) : QVariant());
         if (!sql.exec()) {
             db.rollback();
             return;
@@ -235,63 +246,82 @@ bool ListModel::removeItem(QStandardItem* item)
 
 void ListModel::setItemChecked(QStandardItem* item, bool checked)
 {
+    if (!item)
+        return;
+
     int id = item->data().toInt();
     SqlQuery sql;
     sql.prepare(checked ?
-                "UPDATE list_item SET checked = 1, checked_at = CURRENT_TIMESTAMP WHERE id = :id AND checkable = 1" :
-                "UPDATE list_item SET checked = 0, checked_at = NULL WHERE id = :id AND checkable = 1");
-    sql.bindValue(":id", id);
+                "UPDATE list_item SET checkstate = :checkstate, checked_at = CURRENT_TIMESTAMP WHERE id = :id" :
+                "UPDATE list_item SET checkstate = :checkstate, checked_at = NULL WHERE id = :id");
+    sql.bindValue("id", id);
+    sql.bindValue("checkstate", checked ? Qt::Checked : Qt::Unchecked);
     sql.exec();
-}
-
-void ListModel::setItemCheckable(const QModelIndex& index, bool checkable)
-{
-    if (!index.isValid())
-        return;
-    QStandardItem* item = itemFromIndex(index);
-    if (!item)
-        return;
-    int id = item->data().toInt();
-    if (!id)
-        return;
-    SqlQuery sql;
-    sql.prepare(checkable ?
-                "UPDATE list_item SET checkable = 1, checked = 0 WHERE id = :id":
-                "UPDATE list_item SET checkable = 0, checked = NULL, checked_at = NULL WHERE id = :id");
-    sql.bindValue(":id", id);
-    if (sql.exec()) {
-        item->setCheckable(checkable);
-        if (!checkable)
-            item->setData(QVariant(), Qt::CheckStateRole);
-    }
 }
 
 void ListModel::toggleItemCheckable(const QModelIndex& index)
 {
     if (!index.isValid())
         return;
+
     QStandardItem* item = itemFromIndex(index);
     if (!item)
         return;
-    setItemCheckable(index, !item->isCheckable());
+    int id = item->data().toInt();
+
+    bool checkable = !item->isCheckable();
+
+    SqlQuery sql;
+    sql.prepare(checkable ?
+                "UPDATE list_item SET checkstate = :checkstate WHERE id = :id":
+                "UPDATE list_item SET checkstate = NULL, checked_at = NULL WHERE id = :id");
+    sql.bindValue(":id", id);
+    if (checkable)
+        sql.bindValue("checkstate", Qt::Unchecked);
+    if (!sql.exec())
+        return;
+
+    item->setCheckable(checkable);
+    if (!checkable)
+        item->setData(QVariant(), Qt::CheckStateRole);
 }
 
-void ListModel::toggleItemCheckState(const QModelIndex& index)
+void ListModel::toggleItemCheckState(const QModelIndex& index, Qt::CheckState checkedState)
 {
     if (!index.isValid())
         return;
     QStandardItem* item = itemFromIndex(index);
     if (!item)
         return;
+
+    const int checkState = item->checkState();
+    if (checkState != Qt::Unchecked && checkState != checkedState)
+        return; // cannot cancel checked item and vice versa
+
     const int id = item->data().toInt();
-    const bool checked = item->checkState() == Qt::Checked;
+    bool checked = checkState == checkedState;
+
     SqlQuery sql;
-    sql.prepare(checked ? "UPDATE list_item SET checked = 0, checked_at = NULL WHERE id = :id" :
-                          "UPDATE list_item SET checked = 1, checked_at = CURRENT_TIMESTAMP WHERE id = :id");
-    sql.bindValue(":id", id);
+    if (!checked)
+        sql.prepare("UPDATE list_item SET checkstate = :checkstate, checked_at = CURRENT_TIMESTAMP WHERE id = :id");
+    else
+        sql.prepare("UPDATE list_item SET checkstate = :checkstate, checked_at = NULL WHERE id = :id");
+    sql.bindValue("id", id);
+    sql.bindValue("checkstate", checkedState);
     if (!sql.exec())
         return;
-    item->setCheckState(checked ? Qt::Unchecked : Qt::Checked);
+
+    item->setCheckState(checked ? Qt::Unchecked : checkedState);
+}
+
+void ListModel::toggleItemChecked(const QModelIndex& index)
+{
+    toggleItemCheckState(index, Qt::Checked);
+}
+
+void ListModel::toggleItemCancelled(const QModelIndex& index)
+{
+    toggleItemCheckState(index, Qt::PartiallyChecked);
 }
 
 void ListModel::toggleHighlight(const QModelIndex& index)
@@ -320,6 +350,59 @@ void ListModel::toggleHighlight(const QModelIndex& index)
             item->setData(highlightColor, Qt::BackgroundRole);
         else
             item->setData(QVariant(), Qt::BackgroundRole);
+}
+
+void ListModel::toggleItemIsProject(const QModelIndex& index)
+{
+    if (!index.isValid() || index.column() != 0)
+        return;
+    ListItem* item = static_cast<ListItem*>(itemFromIndex(index));
+    if (!item)
+        return;
+
+    // can only set a top level item or child of another project as a project
+    ListItem* parent = item->parent();
+    if (parent && !parent->isProject())
+        return;
+
+    QSqlDatabase db = QSqlDatabase::database();
+    db.transaction();
+    if (_setItemIsProject(item, !item->isProject())) {
+        db.commit();
+        emit itemIsProject(item);
+    } else
+        db.rollback();
+}
+
+bool ListModel::_setItemIsProject(ListItem* item, bool isProject)
+{
+    int id = item->id();
+
+    if (isProject) {
+        SqlQuery sql;
+        sql.prepare("UPDATE list_item SET is_project = 1 WHERE id = :id");
+        sql.bindValue("id", id);
+        if (!sql.exec())
+            return false;
+        item->setIsProject(true);
+    } else {
+        SqlQuery sql;
+        sql.prepare("UPDATE list_item SET is_project = 0 WHERE id = :id");
+        sql.bindValue("id", id);
+        if (!sql.exec())
+            return false;
+
+        item->setIsProject(false);
+
+        for (int i = 0, n = item->rowCount(); i < n; ++i) {
+            ListItem* child = item->child(i);
+            if (child->isProject())
+                if (!_setItemIsProject(child, false))
+                    return false;
+        }
+    }
+
+    return true;
 }
 
 bool ListModel::setData(const QModelIndex& index, const QVariant& value, int role)
@@ -355,7 +438,7 @@ QModelIndex ListModel::moveItemVertical(const QModelIndex& index, int direction)
 
     int otherId = parent->child(newRow)->data().toInt();
 
-    QSqlDatabase db;
+    QSqlDatabase db = QSqlDatabase::database();
     db.transaction();
 
     SqlQuery sql;
@@ -453,4 +536,93 @@ void ListModel::setExpandedState(QStandardItem* item, bool expanded)
 void ListModel::setExpandedState(const QModelIndex& index, bool expanded)
 {
     setExpandedState(itemFromIndex(index), expanded);
+}
+
+void ListModel::sortChildren(QStandardItem* item)
+{
+    setSortMode(App::SortAll);
+    item->sortChildren(0);
+    saveItemWeights(item);
+}
+
+void ListModel::sortCompleted(QStandardItem* item)
+{
+    setSortMode(App::SortCompleted);
+    item->sortChildren(0);
+    saveItemWeights(item);
+}
+
+void ListModel::saveItemWeights(QStandardItem* parent)
+{
+    if (!parent)
+        return;
+
+    QSqlDatabase db = QSqlDatabase::database();
+    db.transaction();
+    if (_saveItemWeights(parent))
+        db.commit();
+    else
+        db.rollback();
+}
+
+bool ListModel::_saveItemWeights(QStandardItem* parent)
+{
+    int parentId = parent->data().toInt();
+
+    qDebug() << __FUNCTION__ << parentId;
+
+    SqlQuery sql;
+    sql.prepare("SELECT id, weight FROM list_item WHERE parent_id = :parent");
+    sql.bindValue("parent", parentId);
+    if (!sql.exec())
+        return false;
+
+    QHash<int, int> dbWeights;
+    while (sql.next()) {
+        int id = sql.value(0).toInt();
+        int weight = sql.value(1).toInt();
+        dbWeights[id] = weight;
+    }
+
+    for (int row = 0, rowCount = parent->rowCount(); row < rowCount; ++row) {
+        QStandardItem* child = parent->child(row);
+        int id = child->data().toInt();
+        if (dbWeights[id] != row) {
+            sql.prepare("UPDATE list_item SET weight = :row WHERE id = :id");
+            sql.bindValue("row", row);
+            sql.bindValue("id", id);
+            if (!sql.exec())
+                return false;
+        }
+        if (child->rowCount() > 1)
+            if (!_saveItemWeights(child))
+                return false;
+    }
+
+    return true;
+}
+
+QModelIndex ListModel::indexFromId(int itemId) const
+{
+    QStandardItem* found = itemFromId(itemId);
+    if (found)
+        return indexFromItem(found);
+    return QModelIndex();
+}
+
+QStandardItem* ListModel::itemFromId(int itemId, QStandardItem* parent) const
+{
+    if (!parent)
+        parent = invisibleRootItem();
+    for (int i = 0, n = parent->rowCount(); i < n; ++i) {
+        QStandardItem* child = parent->child(i);
+        if (child->data().toInt() == itemId)
+            return child;
+    }
+    for (int i = 0, n = parent->rowCount(); i < n; ++i) {
+        QStandardItem* found = itemFromId(itemId, parent->child(i));
+        if (found)
+            return found;
+    }
+    return nullptr;
 }

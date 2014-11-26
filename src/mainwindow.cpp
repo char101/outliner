@@ -1,6 +1,12 @@
 #include "mainwindow.h"
+#include "utils.h"
+#include "listoutliner.h"
+#include "listmodel.h"
+#include "listtree.h"
 
+#include <QDebug>
 #include <QDesktopWidget>
+#include <QFile>
 #include <QIcon>
 #include <QLabel>
 #include <QMenu>
@@ -9,15 +15,15 @@
 #include <QStatusBar>
 #include <QToolBar>
 #include <QVBoxLayout>
-#include <QDebug>
+#include <QDockWidget>
 
 MainWindow::MainWindow() : QMainWindow()
 {
-    menuVisible = false;
-    statusBarVisible = false;
+    menuVisible = true;
+    statusBarVisible = true;
 
     setWindowTitle("Outliner");
-    setWindowIcon(QIcon(":app.png"));
+    setWindowIcon(Util::findIcon("app"));
 
     setupMenu();
     setupStatusBar();
@@ -38,9 +44,10 @@ void MainWindow::setupUi()
 {
     tabWidget = new QTabWidget(this);
     tabWidget->setStyleSheet("QTabWidget::pane { padding-bottom: 0 }");
+    tabWidget->tabBar()->hide();
 
     listWidget = new ListWidget(this);
-    tabWidget->addTab(listWidget, QIcon(":list.png"), "&Lists");
+    tabWidget->addTab(listWidget, Util::findIcon("list"), "&Lists");
 
     // auto calendarTab = new QWidget;
     // auto calendarLayout = new QVBoxLayout(calendarTab);
@@ -53,6 +60,37 @@ void MainWindow::setupUi()
     // tabWidget->addTab(pomodoroTab, QIcon(":timer.png"), "&Timer");
 
     setCentralWidget(tabWidget);
+
+    QDockWidget* leftDock = new QDockWidget("Outline", this);
+    // QVBoxLayout* leftLayout = new QVBoxLayout(leftWidget);
+    listOutliner = new ListOutliner(this);
+    leftDock->setWidget(listOutliner);
+    // leftDock->setLayout(new QHBoxLayout());
+    addDockWidget(Qt::LeftDockWidgetArea, leftDock);
+
+    QDockWidget* rightDock = new QDockWidget("Schedule", this);
+    addDockWidget(Qt::LeftDockWidgetArea, rightDock);
+
+    tabifyDockWidget(leftDock, rightDock);
+    leftDock->raise();
+
+    connect(listWidget, &ListWidget::listSelected, listOutliner, &ListOutliner::loadOutline);
+    connect(listOutliner->tree, &ListOutlinerTree::itemClickedAlt, [this](QTreeWidgetItem* item, int column) {
+        if (column == 0)
+            listWidget->scrollTo(item->data(0, Qt::UserRole).toInt());
+    });
+    connect(listOutliner->tree, &ListOutlinerTree::itemDoubleClickedAlt, [this](QTreeWidgetItem* item, int column) {
+        if (column == 0)
+            listWidget->zoomTo(item->data(0, Qt::UserRole).toInt());
+    });
+
+    listWidget->loadLists();
+    for (auto tree : listWidget->trees()) {
+        connect(static_cast<ListTree*>(tree)->model(), &ListModel::itemIsProject, [this](QStandardItem* item) {
+            Q_UNUSED(item);
+            listOutliner->loadOutline(listWidget->currentListId());
+        });
+    }
 }
 
 void MainWindow::setupStatusBar()

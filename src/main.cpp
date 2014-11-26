@@ -1,13 +1,25 @@
 #include "mainwindow.h"
+#include "sqldatabase.h"
 #include "databaseutil.h"
 
 #include <QApplication>
-#include <QDebug>
-#include <QIcon>
-#include <QSqlDatabase>
-#include <QSqlQuery>
-#include <QSqlError>
 #include <QCommandLineParser>
+#include <QDebug>
+#include <QDir>
+#include <QIcon>
+#include <QMessageBox>
+#include <QSqlError>
+#include <QSqlQuery>
+#include <QFontDatabase>
+
+void loadCustomFonts()
+{
+    QDir fontsDir("fonts");
+    if (fontsDir.exists())
+        for (QString fontFile : fontsDir.entryList(QDir::Files))
+            if (fontFile.endsWith(".ttf") || fontFile.endsWith(".otf"))
+                QFontDatabase::addApplicationFont(fontsDir.filePath(fontFile));
+}
 
 int main(int argc, char *argv[])
 {
@@ -31,7 +43,10 @@ int main(int argc, char *argv[])
 
     qDebug() << "Database path" << dbPath;
 
-    auto db = QSqlDatabase::addDatabase("QSQLITE");
+    QDir::setCurrent(QFileInfo(dbPath).absoluteDir().path());
+    // loadCustomFonts();
+
+    auto db = SqlDatabase::addDatabase("QSQLITE");
     db.setDatabaseName(dbPath);
     db.open();
 
@@ -39,10 +54,17 @@ int main(int argc, char *argv[])
     db.exec("PRAGMA synchronous = OFF");
 
     DatabaseUtil dbUtil(dbPath);
-    dbUtil.initialize();
-
-    MainWindow win;
-    win.setDatabasePath(dbPath);
-    win.show();
-    return app.exec();
+    if (dbUtil.initialize()) {
+        MainWindow win;
+        win.setDatabasePath(dbPath);
+        win.show();
+        return app.exec();
+    } else {
+        QMessageBox mbox;
+        mbox.setText("Database initialization failed.");
+        mbox.setIcon(QMessageBox::Critical);
+        mbox.setStandardButtons(QMessageBox::Ok);
+        mbox.exec();
+        return 1;
+    }
 }

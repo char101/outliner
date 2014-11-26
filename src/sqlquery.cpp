@@ -40,3 +40,13 @@ bool SqlQuery::fetch()
         return false;
     return first();
 }
+
+void SqlQuery::bindValue(const QString& placeholder, const QVariant& val)
+{
+    if (placeholder[0] != ':') {
+        QString temp = placeholder;
+        temp.prepend(':');
+        QSqlQuery::bindValue(temp, val);
+    } else
+        QSqlQuery::bindValue(placeholder, val);
+}

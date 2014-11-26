@@ -3,5 +3,6 @@
  <qresource>
    <file>app.png</file>
    <file>list.png</file>
+   <file>sort.png</file>
  </qresource>
 </RCC>
