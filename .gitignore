@@ -1,7 +1,7 @@
 /!archive
 /build
-/build-static
 /3rdparty/hoedown
+/fonts
 /gh-pages
 Makefile*
 *.user
