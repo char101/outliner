@@ -1,36 +1,44 @@
 #include "listtree.h"
+
+#include "listmodel.h"
 #include "listitemeditdialog.h"
-#include "listitem.h"
 #include "constants.h"
 #include "utils.h"
-
+//
 #include <QMessageBox>
 #include <QDebug>
 #include <QAction>
 #include <QFont>
 #include <QMenu>
+#include <QHeaderView>
 
 ListTree::ListTree(int listId, QWidget* parent) : QTreeView(parent), _listId(listId)
 {
-    setHeaderHidden(true);
     setAlternatingRowColors(true);
+    setSelectionMode(QAbstractItemView::SingleSelection);
 
-    itemDelegate = new HtmlDelegateTree(this);
-    setItemDelegate(itemDelegate);
+    itemDelegate = new ListItemDelegate(this);
+    setItemDelegateForColumn(0, itemDelegate);
 
-    auto model = new ListModel(listId);
+    ListModel* model = new ListModel(listId, this);
     setModel(model);
     connect(this, &ListTree::expanded, [this](const QModelIndex& index) {
-        this->model()->setExpandedState(index, true);
+        this->model()->itemFromIndex(index)->setExpandedDb(true);
     });
     connect(this, &ListTree::collapsed, [this](const QModelIndex& index) {
-        this->model()->setExpandedState(index, false);
+        this->model()->itemFromIndex(index)->setExpandedDb(false);
     });
+
+    QHeaderView* header = this->header();
+    header->setStretchLastSection(false);
+    // header->resizeSection(0, 250);
+    header->setSectionResizeMode(0, QHeaderView::Stretch);
+    header->resizeSection(1, 60);
 
     resizeTimer.setSingleShot(true);
     connect(&resizeTimer, &QTimer::timeout, this, &ListTree::resizeDone);
 
-    restoreExpandedState();
+    restoreExpandedState(model->root());
 }
 
 ListModel* ListTree::model() const
@@ -38,16 +46,27 @@ ListModel* ListTree::model() const
     return static_cast<ListModel*>(QTreeView::model());
 }
 
+ListItem* ListTree::currentItem() const
+{
+    return model()->itemFromIndex(currentIndex());
+}
+
 void ListTree::keyPressEvent(QKeyEvent* event)
 {
+    if (currentIndex().isValid())
+        if (_itemKeyPress(currentItem(), event->key(), event->modifiers()))
+            return;
+    QTreeView::keyPressEvent(event);
+}
+
+bool ListTree::_itemKeyPress(ListItem* item, int key, Qt::KeyboardModifiers modifiers)
+{
     ListModel* model = this->model();
-    auto modifiers = event->modifiers();
-    switch (event->key()) {
-        case Qt::Key_F2:
+    switch (key) {
         case Qt::Key_Return:
         case Qt::Key_Enter:
-            edit(currentIndex());
-            return;
+            editOrFocus(currentIndex());
+            return true;
         case Qt::Key_Insert:
             if (modifiers & Qt::ControlModifier)
                 appendItem(App::AppendChild);
@@ -55,57 +74,70 @@ void ListTree::keyPressEvent(QKeyEvent* event)
                 appendItem(App::AppendBefore);
             else
                 appendItem(App::AppendAfter);
-            return;
+            return true;
         case Qt::Key_Delete:
             remove(currentIndex());
-            return;
+            return true;
         case Qt::Key_C: // checkable
-            model->toggleItemCheckable(currentIndex());
-            return;
+            item->setCheckableDb(!item->isCheckable());
+            model->itemChanged(item);
+            return true;
         case Qt::Key_Space: // toggle checkbox
-            model->toggleItemCheckState(currentIndex(), Qt::Checked);
-            return;
+            item->setCompletedDb(!item->isCompleted());
+            model->itemChanged(item);
+            return true;
+        case Qt::Key_E:
+        case Qt::Key_F2:
+            edit(currentIndex());
+            return true;
         case Qt::Key_P: // toggle project
-            model->toggleItemIsProject(currentIndex());
-            return;
+            item->setProjectDb(!item->isProject());
+            model->itemChanged(item);
+            emit itemIsProject(item);
+            return true;
         case Qt::Key_X: // cancel item
-            model->toggleItemCancelled(currentIndex());
-            return;
+            item->setCancelledDb(!item->isCancelled());
+            model->itemChanged(item);
+            return true;
         case Qt::Key_H: // highlight
-            model->toggleHighlight(currentIndex());
-            return;
+            item->setHighlightedDb(!item->isHighlighted());
+            model->itemChanged(item);
+            return true;
         case Qt::Key_Z: // zoom
             if (modifiers == Qt::ShiftModifier)
                 unzoom();
             else
                 zoom(currentIndex());
-            return;
+            return true;
+        case Qt::Key_Backspace:
+            unzoom();
+            return true;
         case Qt::Key_Up: // move up
             if (modifiers == Qt::ControlModifier) {
                 moveVertical(App::Up);
-                return;
+                return true;
             }
             break;
         case Qt::Key_Down: // move down
             if (modifiers == Qt::ControlModifier) {
                 moveVertical(App::Down);
-                return;
+                return true;
             }
             break;
         case Qt::Key_Left: // move left
             if (modifiers == Qt::ControlModifier) {
                 moveHorizontal(App::Left);
-                return;
+                return true;
             }
             break;
         case Qt::Key_Right: // move right
             if (modifiers == Qt::ControlModifier) {
                 moveHorizontal(App::Right);
-                return;
+                return true;
             }
             break;
     }
-    QTreeView::keyPressEvent(event);
+    return false;
 }
 
 // void ListTree::mousePressEvent(QMouseEvent* e)
@@ -121,16 +153,7 @@ void ListTree::keyPressEvent(QKeyEvent* event)
 void ListTree::mouseDoubleClickEvent(QMouseEvent* e)
 {
     if (e->button() == Qt::LeftButton) {
-        QModelIndex index = currentIndex();
-        if (!index.isValid())
-            return;
-        QStandardItem* item = model()->itemFromIndex(index);
-        if (!item)
-            return;
-        if (item->rowCount() == 0)
-            edit(index);
-        else
-            zoom(index);
+        editOrFocus(currentIndex());
         return;
     }
     QTreeView::mouseDoubleClickEvent(e);
@@ -147,22 +170,22 @@ void ListTree::contextMenuEvent(QContextMenuEvent* event)
         return;
 
     ListModel* model = this->model();
-    QStandardItem* item = model->itemFromIndex(index);
-    if (item->rowCount() <= 1)
+    ListItem* item = model->itemFromIndex(index);
+    if (item->childCount() <= 1)
         return;
 
     QMenu menu;
-    QAction* sortCompletedAction = menu.addAction(Util::findIcon("sort"), "Sort completed");
-    QAction* sortAllAction = menu.addAction(Util::findIcon("sort"), "Sort all");
+    QAction* sortByStatusAction = menu.addAction(Util::findIcon("sort"), "Sort by status");
+    QAction* sortByStatusAndContentAction = menu.addAction(Util::findIcon("sort"), "Sort by status and content");
 
     QAction* action = menu.exec(event->globalPos());
     if (!action)
         return;
 
-    if (action == sortAllAction) {
-        model->sortChildren(item);
-    } else if (action == sortCompletedAction) {
-        model->sortCompleted(item);
+    if (action == sortByStatusAction) {
+        model->sort(item, App::SortByStatus);
+    } else if (action == sortByStatusAndContentAction) {
+        model->sort(item, App::SortByStatusAndContent);
     }
 }
 
@@ -196,18 +219,15 @@ void ListTree::moveHorizontal(int dir)
         return; // cannot move the first child right
 
     ListModel* model = this->model();
-    QStandardItem* item = model->itemFromIndex(curr);
-    if (!item)
-        return;
-
-    QStandardItem* newParent = model->moveItemHorizontal(item, dir);
+    ListItem* item = model->itemFromIndex(curr);
+    QModelIndex newIndex = model->moveItemHorizontal(curr, dir);
 
     if (dir == App::Left)
         restoreExpandedState(item);
     else
-        restoreExpandedState(newParent);
+        restoreExpandedState(item->parent());
 
-    setCurrentIndex(model->indexFromItem(item));
+    setCurrentIndex(newIndex);
 }
 
 void ListTree::appendItem(App::AppendMode mode)
@@ -224,7 +244,8 @@ void ListTree::appendItem(App::AppendMode mode)
     if (mode == App::AppendChild) {
         auto childIndex = model->appendChild(idx, text);
         if (childIndex.isValid()) {
-            setExpanded(idx, true);
+            // model->itemFromIndex(childIndex.parent())->setExpandedDb(true);
+            // setExpanded(idx.parent(), true);
             setCurrentIndex(childIndex);
         }
     } else {
@@ -235,7 +256,21 @@ void ListTree::appendItem(App::AppendMode mode)
 
 void ListTree::remove(const QModelIndex& index)
 {
-    model()->removeItem(index);
+    if (!index.isValid())
+        return;
+
+    ListItem* item = model()->itemFromIndex(index);
+    if (!item)
+        return;
+
+    QMessageBox mbox;
+    mbox.setText("<b>Do you want to remove this item?</b>");
+    mbox.setInformativeText(item->label());
+    mbox.setIcon(QMessageBox::Warning);
+    mbox.setStandardButtons(QMessageBox::Ok | QMessageBox::Cancel);
+    if (mbox.exec() == QMessageBox::Ok) {
+        model()->removeItem(index);
+    }
 }
 
 void ListTree::edit(const QModelIndex& index)
@@ -243,21 +278,37 @@ void ListTree::edit(const QModelIndex& index)
     if (!index.isValid())
         return;
     ListItem* item = static_cast<ListItem*>(model()->itemFromIndex(index));
+    if (!item)
+        return;
     ListItemEditDialog dialog;
     dialog.setText(item->markdown());
     if (dialog.exec() == QDialog::Accepted) {
         item->setMarkdown(dialog.text());
+        model()->itemChanged(item);
     }
+}
+
+void ListTree::editOrFocus(const QModelIndex& index)
+{
+    if (!index.isValid())
+        return;
+    ListItem* item = model()->itemFromIndex(index);
+    if (!item)
+        return;
+    if (item->childCount() == 0)
+        edit(index);
+    else
+        zoom(index);
 }
 
 void ListTree::zoom(const QModelIndex& index)
 {
     if (!index.isValid())
         return;
-    QStandardItem* item = model()->itemFromIndex(index);
+    ListItem* item = model()->itemFromIndex(index);
     if (!item)
         return;
-    if (item->rowCount() == 0) // no zoom for leaf node
+    if (item->childCount() == 0) // no zoom for leaf node
         return;
     setRootIndex(index);
     emit zoomed(static_cast<ListItem*>(item));
@@ -289,6 +340,7 @@ void ListTree::unzoom()
 
 void ListTree::unzoomTo(const QModelIndex& index)
 {
+    qDebug() << __FUNCTION__ << index;
     QModelIndex root = rootIndex();
     if (root == index)
         return;
@@ -301,6 +353,7 @@ void ListTree::unzoomTo(const QModelIndex& index)
 
 void ListTree::unzoomAll()
 {
+    qDebug() << __FUNCTION__;
     QModelIndex root = rootIndex();
     while (root.isValid()) {
         root = root.parent();
@@ -317,13 +370,13 @@ void ListTree::resizeEvent(QResizeEvent* event)
 
 void ListTree::resizeDone()
 {
-    resizeIndexes(model()->invisibleRootItem());
+    resizeIndexes(model()->root());
 }
 
-void ListTree::resizeIndexes(QStandardItem* item)
+void ListTree::resizeIndexes(ListItem* item)
 {
     auto model = this->model();
-    for (int i = 0, n = item->rowCount(); i < n; ++i) {
+    for (int i = 0, n = item->childCount(); i < n; ++i) {
         auto child = item->child(i);
         auto index = model->indexFromItem(child);
         emit itemDelegate->sizeHintChanged(index);
@@ -335,20 +388,18 @@ void ListTree::restoreExpandedState(const QModelIndex& index)
 {
     if (!index.isValid())
         return;
-    QStandardItem* item = model()->itemFromIndex(index);
+    ListItem* item = model()->itemFromIndex(index);
     if (!item)
         return;
     restoreExpandedState(item);
 }
 
-void ListTree::restoreExpandedState(QStandardItem* item)
+void ListTree::restoreExpandedState(ListItem* item)
 {
-    QStandardItemModel* model = this->model();
     if (!item)
-        item = model->invisibleRootItem();
-    else
-        setExpanded(item->index(), item->data(App::ExpandedStateRole).toBool());
-    for (int i = 0, n = item->rowCount(); i < n; ++i) {
+        return;
+    setExpanded(model()->indexFromItem(item), item->isExpanded());
+    for (int i = 0, n = item->childCount(); i < n; ++i) {
         restoreExpandedState(item->child(i));
     }
 }

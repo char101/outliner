@@ -24,10 +24,9 @@ void ListOutliner::loadOutline(int listId)
 void ListOutliner::loadOutlineInner(int listId, int parentId, QTreeWidgetItem* parent)
 {
     SqlQuery sql;
-    sql.prepare(QString("SELECT id, content FROM list_item WHERE list_id = :list AND parent_id %0 AND is_project = 1 ORDER BY weight ASC").arg(parentId ? "= :parent" : "IS NULL"));
-    sql.bindValue("list", listId);
-    if (parentId)
-        sql.bindValue("parent", parentId);
+    sql.prepare("SELECT id, content FROM list_item WHERE list_id = :list AND parent_id = :parent AND is_project = 1 ORDER BY weight ASC");
+    sql.bindValue(":list", listId);
+    sql.bindValue(":parent", parentId);
     if (!sql.exec())
         return;
     while (sql.next()) {

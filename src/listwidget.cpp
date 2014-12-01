@@ -28,16 +28,16 @@ void ListWidget::loadLists()
         ++nlist;
         int listId = sql.value(0).toInt();
 
-        auto tree = new ListTree(listId, this);
+        ListTree* tree = new ListTree(listId, this);
         _trees.append(tree);
 
-        auto breadcrumb = new Breadcrumb(this);
+        Breadcrumb* breadcrumb = new Breadcrumb(this);
         breadcrumb->setVisible(false);
 
         connect(tree, &ListTree::zoomed, [this, breadcrumb, tree](ListItem* item) {
             // collect all items from this item to the root
             QList<ListItem*> items;
-            for (ListItem* curr = item; curr; curr = curr->parent())
+            for (ListItem* curr = item; curr && !curr->isRoot(); curr = curr->parent())
                 items << curr;
 
             breadcrumb->clear();
@@ -55,7 +55,7 @@ void ListWidget::loadLists()
                 if (i > 0)
                     breadcrumb->addSeparator();
                 connect(action, &QAction::triggered, [this, tree, items, i]() {
-                    tree->unzoomTo(items[i]->model()->indexFromItem(items[i]));
+                    tree->unzoomTo(tree->model()->indexFromItem(items[i]));
                 });
             }
 

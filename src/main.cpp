@@ -1,5 +1,4 @@
 #include "mainwindow.h"
-#include "sqldatabase.h"
 #include "databaseutil.h"
 
 #include <QApplication>
@@ -8,9 +7,8 @@
 #include <QDir>
 #include <QIcon>
 #include <QMessageBox>
-#include <QSqlError>
-#include <QSqlQuery>
 #include <QFontDatabase>
+#include <QSqlQuery>
 
 void loadCustomFonts()
 {
@@ -19,6 +17,15 @@ void loadCustomFonts()
         for (QString fontFile : fontsDir.entryList(QDir::Files))
             if (fontFile.endsWith(".ttf") || fontFile.endsWith(".otf"))
                 QFontDatabase::addApplicationFont(fontsDir.filePath(fontFile));
+}
+
+void clearDb(const QString& dbPath)
+{
+    QFile dbFile(dbPath);
+    if (dbFile.exists()) {
+        qDebug() << "Removing" << dbPath;
+        dbFile.remove();
+    }
 }
 
 int main(int argc, char *argv[])
@@ -38,15 +45,19 @@ int main(int argc, char *argv[])
     QString dbPath;
     if (args.length() > 0)
         dbPath = args[0];
-    else
+    else {
         dbPath = app.applicationDirPath() + "/" + "outline.sqlite";
+// #ifdef QT_DEBUG
+//         clearDb(dbPath);
+// #endif
+    }
 
     qDebug() << "Database path" << dbPath;
 
     QDir::setCurrent(QFileInfo(dbPath).absoluteDir().path());
     // loadCustomFonts();
 
-    auto db = SqlDatabase::addDatabase("QSQLITE");
+    auto db = QSqlDatabase::addDatabase("QSQLITE");
     db.setDatabaseName(dbPath);
     db.open();
 

@@ -8,7 +8,7 @@ class HtmlDelegate : public QStyledItemDelegate
 {
 public:
     HtmlDelegate(QAbstractItemView* parent); // parent is required
-    virtual QAbstractItemView* parent() const;
+    QAbstractItemView* parent() const;
     virtual void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const;
     virtual QColor textColor(const QModelIndex& index) const;
     virtual QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const;

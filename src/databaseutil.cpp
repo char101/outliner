@@ -21,8 +21,10 @@ int DatabaseUtil::version()
 
 void DatabaseUtil::setVersion(QSqlDatabase *db, int value)
 {
+#ifndef QT_DEBUG
     if (!failed)
         backup(); // backup previous database version if there is no error in migration
+#endif
 
     if (failed) {
         qDebug() << "Database change version" << value << "rolled back";
@@ -36,7 +38,6 @@ void DatabaseUtil::setVersion(QSqlDatabase *db, int value)
     if (!sql.exec())
         failed = true;
 
-    qDebug() << "Database change version" << value << "commited";
     db->commit();
 
     // begin next transaction
@@ -131,23 +132,47 @@ bool DatabaseUtil::migrate()
             }
             setVersion(&db, 2);
         case 2:
-            backup();
             runSql("ALTER TABLE list_item ADD highlight INT");
             setVersion(&db, 3);
         case 3:
             addColumn("list_item", "checkstate INTEGER DEFAULT 0 NOT NULL");
             runSql("UPDATE list_item SET checkstate = 2 WHERE checked = 1"); // handle partially checked state (cancelled)
-            migrateTable("list_item", QStringList("checked"));
+            dropColumn("list_item", "checked");
             setVersion(&db, 4);
         case 4:
             // remove checkable column, if checkstate is not null then it's checkable
             addColumn("list_item", "checkstate_new INTEGER");
             runSql("UPDATE list_item SET checkstate_new = CASE WHEN checkable THEN checkstate ELSE NULL END");
-            migrateTable("list_item", QStringList() << "checkstate" << "checkable");
+            dropColumn("list_item", QStringList{"checkstate", "checkable"});
             setVersion(&db, 5);
         case 5:
             addColumn("list_item",  "is_project INTEGER DEFAULT 0 NOT NULL");
             setVersion(&db, 6);
+        case 6:
+            addColumn("list_item", "due_date DATETIME");
+            dropColumn("list_item", QStringList{"attr_date", "attr_priority"});
+            setVersion(&db, 7);
+        case 7:
+            addColumn("list_item", "is_highlighted INTEGER DEFAULT 0 NOT NULL");
+            runSql("UPDATE list_item SET is_highlighted = CASE WHEN highlight IS NULL THEN 0 ELSE 1 END");
+
+            addColumn("list_item", "is_checkable INTEGER DEFAULT 0 NOT NULL");
+            addColumn("list_item", "is_completed INTEGER DEFAULT 0 NOT NULL");
+            addColumn("list_item", "is_cancelled INTEGER DEFAULT 0 NOT NULL");
+            runSql("UPDATE list_item SET "
+                   "is_checkable = CASE WHEN checkstate IS NULL THEN 0 ELSE 1 END, "
+                   "is_completed = CASE WHEN checkstate = 2 THEN 1 ELSE 0 END, "
+                   "is_cancelled = CASE WHEN checkstate = 1 THEN 1 ELSE 0 END");
+
+            addColumn("list_item", "is_expanded INTEGER DEFAULT 0 NOT NULL");
+            runSql("UPDATE list_item SET is_expanded = expanded");
+
+            addColumn("list_item", "parent_id_new INTEGER DEFAULT 0 NOT NULL");
+            runSql("UPDATE list_item SET parent_id_new = CASE WHEN parent_id IS NULL THEN 0 ELSE parent_id END");
+
+            dropColumn("list_item", QStringList{"highlight", "checkstate", "expanded", "parent_id"});
+
+            setVersion(&db, 8);
     }
 
     if (!failed)
@@ -159,6 +184,16 @@ bool DatabaseUtil::migrate()
 void DatabaseUtil::addColumn(const QString& table, const QString& colspec)
 {
     runSql(QString("ALTER TABLE %0 ADD %1").arg(table).arg(colspec));
+}
+
+void DatabaseUtil::dropColumn(const QString& table, const QString& column)
+{
+    dropColumn(table, QStringList{column});
+}
+
+void DatabaseUtil::dropColumn(const QString& table, const QStringList& columns)
+{
+    migrateTable(table, columns);
 }
 
 void DatabaseUtil::migrateTable(const QString& table, const QStringList& droppedColumns)

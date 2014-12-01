@@ -7,6 +7,7 @@
 #include <QVBoxLayout>
 #include <QDialogButtonBox>
 #include <QStatusBar>
+#include <QDateTime>
 
 class ListItemEditDialog : public QDialog
 {
@@ -15,6 +16,7 @@ public:
     ListItemEditDialog(QWidget* parent = 0);
     QSize sizeHint() const;
     QString text() const;
+    QDateTime datetime() const;
     void setText(QString value);
     void keyPressEvent(QKeyEvent* event);
     void done(int r);

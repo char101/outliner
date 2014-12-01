@@ -20,6 +20,8 @@ public:
     void runSql(const QString& sql);
     bool tableExists(const QString& table);
     void addColumn(const QString& table, const QString& colspec);
+    void dropColumn(const QString& table, const QString& column);
+    void dropColumn(const QString& table, const QStringList& columns);
     void migrateTable(const QString& table, const QStringList& droppedColumns);
 private:
     QString dbPath;

@@ -86,7 +86,7 @@ void MainWindow::setupUi()
 
     listWidget->loadLists();
     for (auto tree : listWidget->trees()) {
-        connect(static_cast<ListTree*>(tree)->model(), &ListModel::itemIsProject, [this](QStandardItem* item) {
+        connect(tree, &ListTree::itemIsProject, [this](ListItem* item) {
             Q_UNUSED(item);
             listOutliner->loadOutline(listWidget->currentListId());
         });

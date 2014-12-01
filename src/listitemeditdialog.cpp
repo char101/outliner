@@ -76,6 +76,11 @@ QString ListItemEditDialog::text() const
     return text.trimmed();
 }
 
+QDateTime ListItemEditDialog::datetime() const
+{
+    return QDateTime::currentDateTime();
+}
+
 void ListItemEditDialog::setText(QString value)
 {
     textEditor->setPlainText(value);

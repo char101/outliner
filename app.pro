@@ -12,9 +12,18 @@ SOURCES = 3rdparty/hoedown/src/*.c src/*.cpp
 
 win32 {
 	DEFINES += _CRT_SECURE_NO_WARNINGS
+
+	# Q_COMPILER_INITIALIZER_LISTS is not set for VisualStudio 2013
+	# https://bugreports.qt-project.org/browse/QTBUG-39142
+    # works for 2013 Community
+    # DEFINES += Q_COMPILER_INITIALIZER_LISTS
 }
 CONFIG(release, release|debug) {
-	DEFINES += QT_NO_DEBUG_OUTPUT
+	# QT_NO_DEBUG disable Q_ASSERT
+	# QT_NO_DEBUG_OUTPUT disable qDebug
+	DEFINES += QT_NO_DEBUG QT_NO_DEBUG_OUTPUT
+	QMAKE_CXXFLAGS += /GL
+	QMAKE_LFLAGS += /LTCG
 	DESTDIR = build/release
 	OBJECTS_DIR = build/release/obj
 	MOC_DIR = build/release/moc

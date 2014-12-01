@@ -18,21 +18,6 @@ QTreeView* HtmlDelegateTree::parent() const
     return static_cast<QTreeView*>(HtmlDelegate::parent());
 }
 
-QColor HtmlDelegateTree::textColor(const QModelIndex& index) const
-{
-    QStandardItem* item = static_cast<QStandardItemModel*>(parent()->model())->itemFromIndex(index);
-    if (!item)
-        return QColor(Qt::black);;
-    switch (item->checkState()) {
-        case Qt::Checked:
-            return QColor(Qt::gray);
-        case Qt::PartiallyChecked:
-            return QColor(182, 124, 124);
-        default:
-            return QColor(Qt::black);
-    }
-}
-
 QSize HtmlDelegateTree::sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const
 {
     Q_ASSERT(index.isValid());

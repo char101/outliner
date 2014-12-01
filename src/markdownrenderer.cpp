@@ -21,7 +21,7 @@ MarkdownRenderer::~MarkdownRenderer()
     hoedown_html_renderer_free(renderer);
 }
 
-QString MarkdownRenderer::convert(const QString& input)
+QString MarkdownRenderer::convert(const QString& input) const
 {
     hoedown_buffer* html = hoedown_buffer_new(64);
     QByteArray data = input.toUtf8();
