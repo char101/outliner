@@ -27,7 +27,7 @@ Currently a simple task outliner.
 * Set item as project (`p`)
 * Set item as milestone (`m`)
 * Highlight item (`h`)
-* Set item priority (`1` or `2` or `3` or `0` - no priority)
+* Set item priority (`1` or `2` or `3` or `0` - no priority) - the priority is shown as a color bar on the left of the task
 * Sort children (`s`) - children items will be sorted by priority and completed status
 * Zoom - make current child root of the tree (`z`)
 * Unzoom (`Z` or `Backspace`) or click on the breadcrumb
