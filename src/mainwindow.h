@@ -3,9 +3,10 @@
 #include <QMainWindow>
 #include <QKeyEvent>
 #include <QTabWidget>
+#include <QStatusBar>
 
 #include "listwidget.h"
-#include "listoutliner.h"
+#include "schedulewidget.h"
 
 class MainWindow : public QMainWindow
 {
@@ -15,13 +16,20 @@ public:
     QSize sizeHint() const;
     void keyPressEvent(QKeyEvent* key);
     void setDatabasePath(const QString& dbPath);
+public slots:
+    void showAboutDialog();
+    void showAboutQtDialog();
 private:
-    QTabWidget* tabWidget;
-    ListWidget* listWidget;
-    ListOutliner* listOutliner;
-    bool menuVisible;
-    bool statusBarVisible;
-    void setupMenu();
-    void setupStatusBar();
-    void setupUi();
+    bool _menuVisible;
+    bool _statusBarVisible;
+
+    QTabWidget* _tabs;
+    ListWidget* _list;
+    ScheduleWidget* _schedule;
+    QStatusBar* _statusBar;
+
+    void _setupMenu();
+    void _setupStatusBar();
+    void _setupUi();
+    void _setupDocks();
 };

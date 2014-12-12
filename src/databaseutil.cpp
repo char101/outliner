@@ -10,75 +10,6 @@ DatabaseUtil::DatabaseUtil(const QString& dbPath): dbPath(dbPath), failed(false)
 {
 }
 
-int DatabaseUtil::version()
-{
-    SqlQuery sql;
-    sql.prepare("SELECT value FROM version");
-    sql.exec();
-    sql.next();
-    return sql.value(0).toInt();
-}
-
-void DatabaseUtil::setVersion(QSqlDatabase *db, int value)
-{
-#ifndef QT_DEBUG
-    if (!failed)
-        backup(); // backup previous database version if there is no error in migration
-#endif
-
-    if (failed) {
-        qDebug() << "Database change version" << value << "rolled back";
-        db->rollback();
-        return;
-    }
-
-    SqlQuery sql;
-    sql.prepare("UPDATE version SET value = :value");
-    sql.bindValue(":value", value);
-    if (!sql.exec())
-        failed = true;
-
-    db->commit();
-
-    // begin next transaction
-    db->transaction();
-}
-
-void DatabaseUtil::runSql(const QString& sql)
-{
-    if (failed)
-        return;
-
-    SqlQuery query;
-    query.prepare(sql);
-    if (!query.exec())
-        failed = true;
-}
-
-bool DatabaseUtil::tableExists(const QString& name)
-{
-    QSqlQuery sql;
-    sql.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = :name");
-    sql.bindValue(":name", name);
-    sql.exec();
-    return sql.next();
-}
-
-void DatabaseUtil::backup()
-{
-    QFileInfo info(dbPath);
-
-    QString newPath = QString("%0/%1.v%2.sqlite").arg(info.dir().path()).arg(info.baseName()).arg(version());
-    if (QFile(newPath).exists())
-        return;
-
-    QFile dbFile(dbPath);
-    if (!dbFile.copy(newPath)) {
-        failed = true;
-        qDebug() << "Failed backing up database file to" << newPath;
-    }
-}
-
 bool DatabaseUtil::initialize()
 {
     if (!tableExists("version")) {
@@ -130,28 +61,28 @@ bool DatabaseUtil::migrate()
                 runSql("CREATE INDEX idx_list_item_parent ON list_item (parent_id)");
                 runSql("INSERT INTO list_item (list_id, content, weight) VALUES (1, 'Welcome', 0)");
             }
-            setVersion(&db, 2);
+            setVersion(db, 2);
         case 2:
             runSql("ALTER TABLE list_item ADD highlight INT");
-            setVersion(&db, 3);
+            setVersion(db, 3);
         case 3:
             addColumn("list_item", "checkstate INTEGER DEFAULT 0 NOT NULL");
             runSql("UPDATE list_item SET checkstate = 2 WHERE checked = 1"); // handle partially checked state (cancelled)
             dropColumn("list_item", "checked");
-            setVersion(&db, 4);
+            setVersion(db, 4);
         case 4:
             // remove checkable column, if checkstate is not null then it's checkable
             addColumn("list_item", "checkstate_new INTEGER");
             runSql("UPDATE list_item SET checkstate_new = CASE WHEN checkable THEN checkstate ELSE NULL END");
             dropColumn("list_item", QStringList{"checkstate", "checkable"});
-            setVersion(&db, 5);
+            setVersion(db, 5);
         case 5:
             addColumn("list_item",  "is_project INTEGER DEFAULT 0 NOT NULL");
-            setVersion(&db, 6);
+            setVersion(db, 6);
         case 6:
             addColumn("list_item", "due_date DATETIME");
             dropColumn("list_item", QStringList{"attr_date", "attr_priority"});
-            setVersion(&db, 7);
+            setVersion(db, 7);
         case 7:
             addColumn("list_item", "is_highlighted INTEGER DEFAULT 0 NOT NULL");
             runSql("UPDATE list_item SET is_highlighted = CASE WHEN highlight IS NULL THEN 0 ELSE 1 END");
@@ -172,13 +103,113 @@ bool DatabaseUtil::migrate()
 
             dropColumn("list_item", QStringList{"highlight", "checkstate", "expanded", "parent_id"});
 
-            setVersion(&db, 8);
+            setVersion(db, 8);
+        case 8:
+            addColumn("list_item", "due_date_new TEXT");
+            dropColumn("list_item", "due_date");
+            setVersion(db, 9);
+        case 9:
+            addColumn("list_item", "value INTEGER DEFAULT 0 NOT NULL");
+            setVersion(db, 10);
+        case 10:
+            addColumn("list_item", "is_milestone INTEGER DEFAULT 0 NOT NULL");
+            setVersion(db, 11);
+        case 11:
+            addColumn("list_item", "priority INTEGER DEFAULT 0 NOT NULL");
+            setVersion(db, 12);
+        case 12:
+            addColumn("list_item", "completed_at DATETIME");
+
+            addColumn("list_item", "created_at DATETIME");
+            runSql("UPDATE list_item SET created_at = created");
+
+            addColumn("list_item", "modified_at DATETIME");
+            runSql("UPDATE list_item SET modified_at = modified");
+
+            dropColumn("list_item", QStringList{"created", "modified"});
+
+            setVersion(db, 13);
+        case 13:
+            dropColumn("list_item", "checked_at");
+            setVersion(db, 14);
+        case 14:
+            dropColumn("list_item", "note");
+            setVersion(db, 15);
     }
 
     if (!failed)
         db.commit(); // close the transaction opened by the last setVersion
 
     return !failed;
+}
+
+int DatabaseUtil::version()
+{
+    SqlQuery sql;
+    sql.prepare("SELECT value FROM version");
+    sql.exec();
+    sql.next();
+    return sql.value(0).toInt();
+}
+
+void DatabaseUtil::setVersion(QSqlDatabase& db, int value)
+{
+#ifndef QT_DEBUG
+    if (!failed)
+        backup(); // backup previous database version if there is no error in migration
+#endif
+
+    if (failed) {
+        qDebug() << "Database change version" << value << "rolled back";
+        db.rollback();
+        return;
+    }
+
+    SqlQuery sql;
+    sql.prepare("UPDATE version SET value = :value");
+    sql.bindValue(":value", value);
+    if (!sql.exec())
+        failed = true;
+
+    db.commit();
+
+    // begin next transaction
+    db.transaction();
+}
+
+void DatabaseUtil::runSql(const QString& sql)
+{
+    if (failed)
+        return;
+
+    SqlQuery query;
+    query.prepare(sql);
+    if (!query.exec())
+        failed = true;
+}
+
+bool DatabaseUtil::tableExists(const QString& name)
+{
+    QSqlQuery sql;
+    sql.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = :name");
+    sql.bindValue(":name", name);
+    sql.exec();
+    return sql.next();
+}
+
+void DatabaseUtil::backup()
+{
+    QFileInfo info(dbPath);
+
+    QString newPath = QString("%0/%1.v%2.sqlite").arg(info.dir().path()).arg(info.baseName()).arg(version());
+    if (QFile(newPath).exists())
+        return;
+
+    QFile dbFile(dbPath);
+    if (!dbFile.copy(newPath)) {
+        failed = true;
+        qDebug() << "Failed backing up database file to" << newPath;
+    }
 }
 
 void DatabaseUtil::addColumn(const QString& table, const QString& colspec)

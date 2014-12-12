@@ -3,20 +3,27 @@ TARGET = outliner
 CONFIG += c++11
 RC_FILE = res/app.rc
 RESOURCES = res/app.qrc
-QT += widgets sql qml
+QT += widgets sql
 QTPLUGIN.imageformats = -
+QTPLUGIN.qmltooling = -
+QTPLUGIN.bearer = -
+QTPLUGIN.printsupport = -
+
+DEFINES *= QT_USE_QSTRINGBUILDER
 
 INCLUDEPATH += . 3rdparty/hoedown/src
 HEADERS = 3rdparty/hoedown/src/*.h src/*.h
 SOURCES = 3rdparty/hoedown/src/*.c src/*.cpp
 
 win32 {
-	DEFINES += _CRT_SECURE_NO_WARNINGS
+	appicon.target = res/app.ico
+	appicon.commands = convert.exe res/app16.png res/app.ico
+	appicon.depends = res/app16.png
 
-	# Q_COMPILER_INITIALIZER_LISTS is not set for VisualStudio 2013
-	# https://bugreports.qt-project.org/browse/QTBUG-39142
-    # works for 2013 Community
-    # DEFINES += Q_COMPILER_INITIALIZER_LISTS
+	QMAKE_EXTRA_TARGETS += appicon
+	PRE_TARGETDEPS += res/app.ico
+
+	DEFINES += _CRT_SECURE_NO_WARNINGS
 }
 CONFIG(release, release|debug) {
 	# QT_NO_DEBUG disable Q_ASSERT

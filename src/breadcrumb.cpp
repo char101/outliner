@@ -38,7 +38,6 @@ void Breadcrumb::popAction()
     if (actions.isEmpty())
         return;
 
-    qDebug() << QString("%0:%1 (%2)").arg(__FILE__).arg(__LINE__).arg(__FUNCTION__) << actions.last();
     removeAction(actions.last());
 
     // remove separators; 2 because the last one has been removed
@@ -54,7 +53,6 @@ void Breadcrumb::popAction()
         return;
     QString text = actions.last()->text();
     removeAction(actions.last());
-    qDebug() << QString("%0:%1 (%2)").arg(__FILE__).arg(__LINE__).arg(__FUNCTION__) << text;
     addCurrent(text);
 
     actions = this->actions();

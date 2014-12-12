@@ -1,37 +1,46 @@
 #pragma once
 
+#include "constants.h"
 #include "markdownrenderer.h"
-#include "listmodel.h"
 
 #include <QModelIndex>
+#include <QDateTime>
 
-class ListItem
+class ListModel;
+
+class ListItem : public QObject
 {
+    Q_OBJECT
 public:
     // root
-    ListItem(int listId);
+    ListItem(ListModel* model, int listId);
     // new item
     ListItem(int listId, int id, QString content);
     // existing item
-    ListItem(int listId, int id, QString content, bool isExpanded, bool isProject, bool isHighlighted,
-             bool isCheckable, bool isCompleted, bool isCancelled);
+    ListItem(int listId, int id, QString content, bool isExpanded, bool isProject, bool isMilestone, bool isHighlighted,
+             bool isCheckable, bool isCompleted, bool isCancelled, QDate dueDate, int priority);
     ~ListItem();
 
-    bool isRoot() const;
+    ListModel* model() const { return _model; };
+    void setModel(ListModel* model);
+
+    bool isRoot() const { return _id == 0; };
     bool sort(App::SortMode mode);
 
-    int id() const;
+    int id() const { return _id; };
     int weight() const;
 
     QString html() const;
-    QString text() const;
-    QString label() const;
+    QString text() const { return _text; };
+    QString label() const { return _label; };
 
-    Qt::ItemFlags flags() const;
+    Qt::ItemFlags flags() const { return _flags; };
     void setFlag(Qt::ItemFlags flag, bool state = true);
 
-    int childCount() const;
+    int childCount() const { return _children.length(); };
     ListItem* child(int row) const;
+    ListItem* firstChild() const;
+    ListItem* lastChild() const;
     void appendChild(ListItem* child);
     void insertChild(int row, ListItem* child);
     void removeChild(int row);
@@ -39,48 +48,55 @@ public:
     bool takeChildDb(int row);
     ListItem* takeChild(int row);
 
-    int row() const;
-    void setRow(int value);
-    bool setRowDb(int value);
-    void adjustRow(int delta);
+    int row() const { return _row; };
+    bool setRow(int row);
 
-    QString markdown() const;
-    void setMarkdown(const QString& value);
+    QString markdown() const { return _markdown; };
+    bool setMarkdown(const QString& value);
 
-    ListItem* parent() const;
+    ListItem* parent() const { return _parent; };
     void setParent(ListItem* parent, int row);
-    bool setParentDbOnly(ListItem* parent, int row);
+    bool setParentDb(ListItem* parent, int row);
 
-    int level() const;
+    int level() const { return _level; };
     void setLevel(const int level);
 
-    bool isExpanded() const;
-    void setExpanded(bool state);
-    bool setExpandedDb(bool state);
+    bool isExpanded() const { return _isExpanded; };
+    bool setExpanded(bool isExpanded);
 
-    bool isCheckable() const;
-    void setCheckable(const bool isCheckable);
-    bool setCheckableDb(const bool isCheckable);
+    bool isCheckable() const { return _isCheckable; };
+    bool setCheckable(const bool isCheckable);
 
-    bool isCompleted() const;
-    void setCompleted(const bool isCompleted);
-    bool setCompletedDb(const bool isCompleted);
+    bool isCompleted() const { return _isCompleted; };
+    bool setCompleted(const bool isCompleted);
 
-    bool isCancelled() const;
-    void setCancelled(const bool isCancelled);
-    bool setCancelledDb(const bool isCancelled);
+    bool isCancelled() const { return _isCancelled; };
+    bool setCancelled(const bool isCancelled);
 
-    bool isProject() const;
-    void setProject(const bool isProject);
-    bool setProjectDb(const bool isProject);
+    bool isProject() const { return _isProject; };
+    bool setProject(const bool isProject);
 
-    bool isHighlighted() const;
-    void setHighlighted(const bool isHighlighted);
-    bool setHighlightedDb(const bool isHighlighted);
+    bool isMilestone() const { return _isMilestone; };
+    bool setMilestone(const bool isMilestone);
+
+    bool isHighlighted() const { return _isHighlighted; };
+    bool setHighlighted(const bool isHighlighted);
+
+    QDate dueDate() const { return _dueDate; };
+    bool setDueDate(const QDate& dueDate);
+
+    int priority() const { return _priority; };
+    bool setPriority(int priority);
+signals:
+    void scheduleChanged();
+    void operationError(const QString& message);
 private:
+    ListModel* _model{nullptr};
+
     int _listId{0};
     int _id{0};
     int _row{0};
+    int _priority{0};
 
     QString _markdown;
     QString _html;
@@ -88,11 +104,13 @@ private:
     QString _label;
 
     bool _isProject{false};
+    bool _isMilestone{false};
     bool _isExpanded{false};
     bool _isCheckable{false};
     bool _isCompleted{false};
     bool _isCancelled{false};
     bool _isHighlighted{false};
+    QDate _dueDate;
 
     ListItem* _parent{nullptr};
     int _level{0};
@@ -101,4 +119,9 @@ private:
     QList<ListItem*> _children;
 
     static const MarkdownRenderer renderer;
+
+    void _adjustRow(int delta) { _row += delta; };
+    void _setMarkdown(const QString& value);
+    void _setCheckable(bool isCheckable);
+    bool _setAttribute(const QString& column, QVariant value) const;
 };

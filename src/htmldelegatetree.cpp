@@ -1,9 +1,9 @@
 #include "htmldelegatetree.h"
+#include "debug.h"
 
 #include <QPainter>
 #include <QTextDocument>
 #include <QApplication>
-#include <QDebug>
 #include <QStandardItem>
 #include <QStandardItemModel>
 
@@ -34,8 +34,9 @@ QSize HtmlDelegateTree::sizeHint(const QStyleOptionViewItem& option, const QMode
 
     const int column = index.column();
     int textWidth = parent->columnWidth(column);
+
     if (column == 0) {
-        // indentation/arrows
+        // indentation/arrows (only in column 0)
         int level = 1; // the top level items are already indented once
         QModelIndex curr = index.parent();
         while (curr.isValid()) {
@@ -43,19 +44,13 @@ QSize HtmlDelegateTree::sizeHint(const QStyleOptionViewItem& option, const QMode
             curr = curr.parent();
         }
         textWidth -= level * parent->indentation();
-
-        // checkbox
-        if (opt.features & QStyleOptionViewItem::HasCheckIndicator) {
-            // http://code.woboq.org/qt5/qtbase/src/widgets/styles/qcommonstyle.cpp.html#937
-            textWidth -= style->pixelMetric(QStyle::PM_IndicatorWidth, &option, parent) + style->pixelMetric(QStyle::PM_FocusFrameHMargin, &option, parent) + 1; // checkbox width + margin
-        }
-
-        // icon
-        if (opt.features & QStyleOptionViewItem::HasDecoration) {
-            // http://code.woboq.org/qt5/qtbase/src/widgets/styles/qcommonstyle.cpp.html#810
-            textWidth -= opt.decorationSize.width() + style->pixelMetric(QStyle::PM_FocusFrameHMargin, &option, parent) + 1; // icon width + margin
-        }
     }
+
+    if (opt.features & QStyleOptionViewItem::HasCheckIndicator)
+        textWidth -= checkboxWidth(style, parent, opt);
+    if (opt.features & QStyleOptionViewItem::HasDecoration)
+        textWidth -= iconWidth(style, parent, opt);
+
     doc.setTextWidth(textWidth);
     return QSize(textWidth, doc.size().height());
 }

@@ -1,14 +1,15 @@
 #include "listmodel.h"
 
 #include "listtree.h"
-// #include "listitem.h"
 #include "sqlquery.h"
+#include "utils.h"
+#include "debug.h"
 
-#include <QDebug>
+#include <QDateTime>
 
 ListModel::ListModel(int listId, ListTree* parent) : QAbstractItemModel(parent), _listId(listId)
 {
-    _root = new ListItem(listId);
+    _root = new ListItem(this, listId);
     _loadItems(_root);
 }
 
@@ -24,7 +25,7 @@ void ListModel::_loadItems(ListItem* parent)
     int parentId = parent->id();
 
     SqlQuery sql;
-    sql.prepare("SELECT id, content, is_expanded, is_project, is_highlighted, is_checkable, is_completed, is_cancelled "
+    sql.prepare("SELECT id, weight, content, is_expanded, is_project, is_milestone, is_highlighted, is_checkable, is_completed, is_cancelled, due_date, priority "
                 "FROM list_item WHERE list_id = :list AND parent_id = :parent "
                 "ORDER BY weight ASC");
     sql.bindValue(":list", _listId);
@@ -32,21 +33,37 @@ void ListModel::_loadItems(ListItem* parent)
     if (!sql.exec())
         return;
 
+    int currRow = 0;
     while (sql.next()) {
         int c = -1;
         int id = sql.value(++c).toInt();
+        int row = sql.value(++c).toInt();
         QString content = sql.value(++c).toString();
         bool isExpanded = sql.value(++c).toBool();
         bool isProject = sql.value(++c).toBool();
+        bool isMilestone = sql.value(++c).toBool();
         bool isHighlighted = sql.value(++c).toBool();
         bool isCheckable = sql.value(++c).toBool();
         bool isCompleted = sql.value(++c).toBool();
         bool isCancelled = sql.value(++c).toBool();
+        QDate dueDate = sql.value(++c).toDate();
+        int priority = sql.value(++c).toInt();
 
-        ListItem* item = new ListItem(_listId, id, content, isExpanded, isProject, isHighlighted, isCheckable, isCompleted, isCancelled);
+        // Fix gap between row in database
+        if (row != currRow) {
+            SqlQuery sql;
+            sql.prepare("UPDATE list_item SET weight = :weight WHERE id = :id");
+            sql.bindValue(":weight", currRow);
+            sql.bindValue(":id", id);
+            sql.exec();
+        }
+
+        ListItem* item = new ListItem(_listId, id, content, isExpanded, isProject, isMilestone, isHighlighted, isCheckable, isCompleted, isCancelled, dueDate, priority);
         parent->appendChild(item);
 
         _loadItems(item);
+
+        ++currRow;
     }
 }
 
@@ -69,7 +86,7 @@ QModelIndex ListModel::index(int row, int column, const QModelIndex& parent) con
         return QModelIndex();
 
     ListItem* parentItem = itemFromIndex(parent);
-    if (row >= parentItem->childCount())
+    if (!parentItem || row >= parentItem->childCount())
         return QModelIndex();
 
     ListItem* childItem = parentItem->child(row);
@@ -93,39 +110,56 @@ QModelIndex ListModel::parent(const QModelIndex& index) const
 
 QVariant ListModel::data(const QModelIndex& index, int role) const
 {
-    if (!index.isValid())
-        return QVariant();
-
-    ListItem* item = itemFromIndex(index);
-    switch (index.column()) {
-        case 0:
+    if (index.isValid()) {
+        ListItem* item = itemFromIndex(index);
+        if (item) {
+            // all columns
             switch (role) {
-                case Qt::DisplayRole:
-                    return item->html();
-                case Qt::EditRole:
-                    return item->markdown();
                 case Qt::BackgroundRole:
                     if (item->isHighlighted())
                         return App::HighlightBackgroundColor;
                     else if (item->isProject())
                         return App::ProjectBackgroundColor;
+                    else if (item->isMilestone())
+                        return App::MilestoneBackgroundColor;
                     else
                         return QVariant();
-                case Qt::CheckStateRole:
-                    if (item->isCheckable())
-                        if (item->isCompleted())
-                            return Qt::Checked;
-                        else if (item->isCancelled())
-                            return Qt::PartiallyChecked;
-                        else
-                            return Qt::Unchecked;
-                    break;
-            } break;
-        case 1:
-            switch (role) {
-                case Qt::DisplayRole:
-                    return "";
-            } break;
+            }
+            // specific column
+            switch (index.column()) {
+                case 0:
+                    switch (role) {
+                        case Qt::DisplayRole:
+                            return item->html();
+                        case Qt::EditRole:
+                            return item->markdown();
+                        case Qt::CheckStateRole:
+                            if (item->isCheckable())
+                                if (item->isCompleted())
+                                    return Qt::Checked;
+                                else if (item->isCancelled())
+                                    return Qt::PartiallyChecked;
+                                else
+                                    return Qt::Unchecked;
+                            break;
+                        case Qt::DecorationRole:
+                            if (item->isProject())
+                                return Util::findIcon("project");
+                            if (item->isMilestone())
+                                return Util::findIcon("milestone");
+                            break;
+#ifdef QT_DEBUG
+                        case Qt::ToolTipRole:
+                            return QString("id: %1 row: %2 parent: %3 milestone: %4 priority: %5").arg(item->id()).arg(item->row()).arg(item->parent()->id()).arg(item->isMilestone()).arg(item->priority());
+#endif
+                    } break;
+                case 1:
+                    switch (role) {
+                        case Qt::DisplayRole:
+                            return item->dueDate();
+                    } break;
+            }
+        }
     }
     return QVariant();
 }
@@ -143,19 +177,19 @@ bool ListModel::setData(const QModelIndex& index, const QVariant& value, int rol
             case Qt::CheckStateRole:
                 switch (value.toInt()) {
                     case Qt::Checked:
-                        if (item->setCompletedDb(true)) {
+                        if (item->setCompleted(true)) {
                             itemChanged(item);
                             return true;
                         }
                         break;
                     case Qt::PartiallyChecked:
-                        if (item->setCancelledDb(true)) {
+                        if (item->setCancelled(true)) {
                             itemChanged(item);
                             return true;
                         }
                         break;
                     case Qt::Unchecked:
-                        if (item->setCompletedDb(false) && item->setCancelledDb(false)) {
+                        if (item->setCompleted(false) && item->setCancelled(false)) {
                             itemChanged(item);
                             return true;
                         }
@@ -171,7 +205,7 @@ QVariant ListModel::headerData(int section, Qt::Orientation orientation, int rol
 {
     if (orientation == Qt::Horizontal && role == Qt::DisplayRole)
         switch (section) {
-            case 0: return "Outline";
+            case 0: return "Task";
             case 1: return "Due Date";
         }
     return QVariant();
@@ -183,16 +217,6 @@ Qt::ItemFlags ListModel::flags(const QModelIndex& index) const
     if (index.isValid())
         flags |= itemFromIndex(index)->flags();
     return flags;
-}
-
-ListItem* ListModel::itemFromIndex(const QModelIndex& index) const
-{
-    return index.isValid() ? static_cast<ListItem*>(index.internalPointer()) : _root;
-};
-
-QModelIndex ListModel::indexFromItem(ListItem* item) const
-{
-    return item->isRoot() ? QModelIndex() : createIndex(item->row(), 0, item);
 }
 
 QModelIndex ListModel::indexFromId(int itemId) const
@@ -256,7 +280,7 @@ QModelIndex ListModel::_appendAfter(ListItem* item, const QString& content, App:
     if (!sql.exec())
         return QModelIndex();
 
-    sql.prepare("INSERT INTO list_item (list_id, parent_id, weight, content) VALUES (:list, :parent, :weight, :content)");
+    sql.prepare("INSERT INTO list_item (list_id, parent_id, weight, content, created_at) VALUES (:list, :parent, :weight, :content, CURRENT_TIMESTAMP)");
     sql.bindValue(":list", _listId);
     sql.bindValue(":parent", parent->id());
     sql.bindValue(":weight", row);
@@ -268,7 +292,9 @@ QModelIndex ListModel::_appendAfter(ListItem* item, const QString& content, App:
 
     beginInsertRows(indexFromItem(parent), row, row);
     ListItem* newItem = new ListItem(_listId, id, content);
-    parent->appendChild(newItem);
+    parent->insertChild(row, newItem);
+    if (isNewItemCheckable(item))
+        newItem->setCheckable(true);
     endInsertRows();
 
     return indexFromItem(newItem);
@@ -276,17 +302,17 @@ QModelIndex ListModel::_appendAfter(ListItem* item, const QString& content, App:
 
 QModelIndex ListModel::appendChild(const QModelIndex& index, QString content)
 {
-    if (!index.isValid() || index.column() != 0)
+    if (index.isValid() && index.column() != 0)
         return QModelIndex();
 
     ListItem* parent = itemFromIndex(index);
     if (!parent)
-        return QModelIndex(); // cannot append child to root, use append after
+        return QModelIndex();
 
     int row = parent->childCount();
 
     SqlQuery sql;
-    sql.prepare("INSERT INTO list_item (list_id, parent_id, weight, content) VALUES (:list, :parent, :weight, :content)");
+    sql.prepare("INSERT INTO list_item (list_id, parent_id, weight, content, created_at) VALUES (:list, :parent, :weight, :content, CURRENT_TIMESTAMP)");
     sql.bindValue(":list", _listId);
     sql.bindValue(":parent", parent->id());
     sql.bindValue(":weight", row);
@@ -298,6 +324,8 @@ QModelIndex ListModel::appendChild(const QModelIndex& index, QString content)
 
     beginInsertRows(indexFromItem(parent), row, row);
     ListItem* newItem = new ListItem(_listId, id, content);
+    if (isNewItemCheckable(parent))
+        newItem->setCheckable(true);
     parent->appendChild(newItem);
     endInsertRows();
 
@@ -356,8 +384,8 @@ QModelIndex ListModel::moveItemVertical(const QModelIndex& index, int direction)
     QSqlDatabase db = QSqlDatabase::database();
     db.transaction();
 
-    if (item->setRowDb(direction == App::Down ? row + 1 : row - 1) &&
-        otherItem->setRowDb(row)) {
+    if (item->setRow(direction == App::Down ? row + 1 : row - 1) &&
+        otherItem->setRow(row)) {
         db.commit();
         if (beginMoveRows(index.parent(), downRow, downRow, index.parent(), downRow + 2)) {
             parent->moveChild(downRow);
@@ -388,7 +416,7 @@ QModelIndex ListModel::moveItemHorizontal(const QModelIndex& index, int directio
         QSqlDatabase db = QSqlDatabase::database();
         db.transaction();
         if (parent->takeChildDb(row) &&
-            item->setParentDbOnly(newParent, newRow)) {
+            item->setParentDb(newParent, newRow)) {
             db.commit();
             if (beginMoveRows(indexFromItem(parent), row, row, indexFromItem(newParent), newRow)) {
                 newParent->insertChild(newRow, parent->takeChild(row));
@@ -407,13 +435,13 @@ QModelIndex ListModel::moveItemHorizontal(const QModelIndex& index, int directio
         QSqlDatabase db = QSqlDatabase::database();
         db.transaction();
         if (parent->takeChildDb(row) &&
-            item->setParentDbOnly(newParent, newParent->childCount())) {
+            item->setParentDb(newParent, newParent->childCount())) {
             db.commit();
             if (beginMoveRows(indexFromItem(parent), row, row, indexFromItem(newParent), newParent->childCount())) {
                 newParent->appendChild(parent->takeChild(row));
                 endMoveRows();
             }
-            newParent->setExpandedDb(true);
+            newParent->setExpanded(true);
             return indexFromItem(item);
         } else {
             db.rollback();
@@ -431,6 +459,8 @@ void ListModel::removeItem(const QModelIndex& index)
     if (!item)
         return;
 
+    bool isProject = item->isProject();
+
     ListItem* parent = item->parent();
 
     // disable removing the last child
@@ -444,6 +474,8 @@ void ListModel::removeItem(const QModelIndex& index)
     db.transaction();
     if (_removeItem(item)) {
         db.commit();
+        if (isProject)
+            emit projectRemoved();
     } else {
         db.rollback();
     }
@@ -479,4 +511,11 @@ void ListModel::itemChanged(ListItem* item, const QVector<int>& roles)
 {
     QModelIndex itemIndex = indexFromItem(item);
     emit dataChanged(itemIndex, itemIndex, roles);
+    if (item->isProject() || item->isMilestone())
+        emit projectChanged(item);
+}
+
+bool ListModel::isNewItemCheckable(ListItem* ref)
+{
+    return ref->isCheckable() || ref->isProject() || ref->isMilestone();
 }

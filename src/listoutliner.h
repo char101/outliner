@@ -1,6 +1,7 @@
 #pragma once
 
 #include "listoutlinertree.h"
+#include "markdownrenderer.h"
 
 #include <QWidget>
 #include <QTreeWidget>
@@ -11,11 +12,16 @@ class ListOutliner : public QWidget
     Q_OBJECT
 public:
     ListOutliner(QWidget* parent = 0);
-    QSize sizeHint() const;
-    ListOutlinerTree* tree;
+    QSize sizeHint() const { return QSize(80, QWidget::sizeHint().height()); };
+    ListOutlinerTree* tree() const { return _tree; };
 public slots:
     void loadOutline(int listId);
+    void reloadOutline();
 private:
-    QVBoxLayout* layout;
-    void loadOutlineInner(int listId, int parentId = 0, QTreeWidgetItem* parent = 0);
+    QVBoxLayout* _layout;
+    ListOutlinerTree* _tree;
+    int _currentListId;
+    static MarkdownRenderer _renderer;
+
+    void _loadOutline(int parentId = 0, QTreeWidgetItem* parent = 0);
 };

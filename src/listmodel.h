@@ -1,11 +1,11 @@
 #pragma once
 
 #include "constants.h"
+#include "listitem.h"
 
 #include <QAbstractItemModel>
 
 class ListTree;
-class ListItem;
 
 class ListModel : public QAbstractItemModel
 {
@@ -29,13 +29,13 @@ public:
 
     Qt::ItemFlags flags(const QModelIndex& index) const override;
 
-    ListItem* itemFromIndex(const QModelIndex& index) const;
-    QModelIndex indexFromItem(ListItem* item) const;
+    ListItem* itemFromIndex(const QModelIndex& index) const { return index.isValid() ? static_cast<ListItem*>(index.internalPointer()) : _root; };
+    QModelIndex indexFromItem(ListItem* item) const { return item->isRoot() ? QModelIndex() : createIndex(item->row(), 0, item); };
     QModelIndex indexFromId(int itemId) const;
     ListItem* itemFromId(int itemId, ListItem* parent = 0) const;
 
-    QModelIndex appendAfter(const QModelIndex& index, QString content, App::AppendMode mode = App::AppendAfter);
     QModelIndex appendChild(const QModelIndex& index, QString content);
+    QModelIndex appendAfter(const QModelIndex& index, QString content, App::AppendMode mode = App::AppendAfter);
 
     void sort(ListItem* parent, App::SortMode mode);
     QModelIndex moveItemVertical(const QModelIndex& index, int direction);
@@ -44,6 +44,14 @@ public:
     void removeItem(const QModelIndex& index);
 
     void itemChanged(ListItem* item, const QVector<int>& roles = QVector<int>());
+
+    static bool isNewItemCheckable(ListItem* ref);
+signals:
+    void projectAdded(ListItem* item);
+    void projectChanged(ListItem* item);
+    void projectRemoved();
+    void scheduleChanged();
+    void operationError(const QString& message);
 private:
     int _listId;
     ListItem* _root;

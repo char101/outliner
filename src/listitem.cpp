@@ -1,39 +1,64 @@
 #include "listitem.h"
 
+#include "listmodel.h"
 #include "sqlquery.h"
+#include "utils.h"
+#include "debug.h"
 
 #include <QTextDocument>
-#include <QDebug>
 
 const MarkdownRenderer ListItem::renderer{};
 
-ListItem::ListItem(int listId) : _listId(listId) {}
+ListItem::ListItem(ListModel* model, int listId) : QObject(), _listId(listId)
+{
+    setModel(model);
+}
 
 ListItem::ListItem(int listId, int id, QString content)
-    : _listId(listId), _id(id), _markdown(content)
+    : QObject(), _listId(listId), _id(id), _markdown(content)
 {
-    setMarkdown(content);
+    _setMarkdown(content);
 }
 
 ListItem::ListItem(int listId, int id, QString content, bool isExpanded, bool isProject,
-                   bool isHighlighted, bool isCheckable, bool isCompleted, bool isCancelled)
-    : _listId(listId), _id(id)
+                   bool isMilestone, bool isHighlighted, bool isCheckable, bool isCompleted,
+                   bool isCancelled, QDate dueDate, int priority)
+    : QObject(), _listId(listId), _id(id)
 {
-    setMarkdown(content);
-    setExpanded(isExpanded);
-    setProject(isProject);
-    setHighlighted(isHighlighted);
-    setCheckable(isCheckable);
-    setCompleted(isCompleted);
-    if (isCheckable) {
-        setCompleted(isCompleted);
-        setCancelled(isCancelled);
+    _setMarkdown(content);
+    _setCheckable(isCheckable);
+
+    _isExpanded = isExpanded;
+    _isProject = isProject;
+    _isMilestone = isMilestone;
+    _isHighlighted = isHighlighted;
+    if (_isCheckable) {
+        _isCompleted = isCompleted;
+        _isCancelled = isCancelled;
     }
+    _priority = priority;
+    _dueDate = dueDate;
 }
 
 ListItem::~ListItem() { qDeleteAll(_children); }
 
-bool ListItem::isRoot() const { return _id == 0; }
+void ListItem::setModel(ListModel* model)
+{
+    if (_model == model)
+        return;
+
+    if (_model) {
+        disconnect(this, &ListItem::scheduleChanged, _model, &ListModel::scheduleChanged);
+        disconnect(this, &ListItem::operationError, _model, &ListModel::operationError);
+    }
+
+    _model = model;
+
+    if (_model) {
+        connect(this, &ListItem::scheduleChanged, _model, &ListModel::scheduleChanged);
+        connect(this, &ListItem::operationError, _model, &ListModel::operationError);
+    }
+}
 
 bool ListItem::sort(App::SortMode mode)
 {
@@ -62,7 +87,7 @@ bool ListItem::sort(App::SortMode mode)
     for (int i = 0; i < count; ++i) {
         ListItem* child = newChildren.at(i);
         if (child->row() != i)
-            success = child->setRowDb(i);
+            success = child->setRow(i);
         if (!success)
             break;
     }
@@ -79,22 +104,24 @@ bool ListItem::sort(App::SortMode mode)
     return success;
 }
 
-int ListItem::id() const { return _id; }
-
 int ListItem::weight() const
 {
     if (_isCancelled)
-        return 2;
+        return 100;
     if (_isCompleted)
-        return 1;
-    return 0;
+        return 99;
+    if (_priority == 0)
+        return 98;
+    return _priority;
 }
 
-QString ListItem::html() const { return _html; }
-QString ListItem::text() const { return _text; }
-QString ListItem::label() const { return _label; }
+QString ListItem::html() const
+{
+    if (isProject())
+        return QStringLiteral("<b>") + _html + QStringLiteral("</b>");
+    return _html;
+}
 
-Qt::ItemFlags ListItem::flags() const { return _flags; };
 void ListItem::setFlag(Qt::ItemFlags flag, bool state)
 {
     if (state)
@@ -103,13 +130,25 @@ void ListItem::setFlag(Qt::ItemFlags flag, bool state)
         _flags &= ~flag;
 }
 
-int ListItem::childCount() const { return _children.count(); };
-
 ListItem* ListItem::child(int row) const
 {
     if (!(row >= 0 && row < _children.length()))
         return nullptr;
     return _children.at(row);
+}
+
+ListItem* ListItem::firstChild() const
+{
+    if (_children.isEmpty())
+        return nullptr;
+    return _children.first();
+}
+
+ListItem* ListItem::lastChild() const
+{
+    if (_children.isEmpty())
+        return nullptr;
+    return _children.last();
 }
 
 void ListItem::appendChild(ListItem* child)
@@ -121,16 +160,22 @@ void ListItem::appendChild(ListItem* child)
 void ListItem::insertChild(int row, ListItem* child)
 {
     for (int i = row, n = _children.length(); i < n; ++i)
-        _children.at(i)->adjustRow(1);
+        _children.at(i)->_adjustRow(1);
     child->setParent(this, row);
     _children.insert(row, child);
 }
 
 void ListItem::removeChild(int row)
 {
+    int nchild = _children.length();
+    if (!(row >= 0 && row < nchild))
+        return;
+
+    for (int i = row + 1; i < nchild; ++i)
+        _children.at(i)->_adjustRow(-1);
+
     ListItem* item = _children.takeAt(row);
-    if (item)
-        delete item;
+    delete item;
 }
 
 void ListItem::moveChild(int row) { _children.move(row, row + 1); }
@@ -138,7 +183,8 @@ void ListItem::moveChild(int row) { _children.move(row, row + 1); }
 bool ListItem::takeChildDb(int row)
 {
     SqlQuery sql;
-    sql.prepare("UPDATE list_item SET weight = weight - 1 WHERE list_id = :list AND parent_id = :parent AND weight > :row");
+    sql.prepare("UPDATE list_item SET weight = weight - 1 WHERE list_id = :list AND parent_id = "
+                ":parent AND weight > :row");
     sql.bindValue(":list", _listId);
     sql.bindValue(":parent", _id);
     sql.bindValue(":row", row);
@@ -147,37 +193,24 @@ bool ListItem::takeChildDb(int row)
 
 ListItem* ListItem::takeChild(int row)
 {
-    for (int i = row + 1, n = _children.length(); i < n; ++i)
-        _children.at(i)->adjustRow(-1);
+    int nchild = _children.length();
+    if (!(row >= 0 && row < nchild))
+        return nullptr;
+
+    for (int i = row + 1; i < nchild; ++i)
+        _children.at(i)->_adjustRow(-1);
+
     ListItem* child = _children.takeAt(row);
     child->setParent(nullptr, 0);
     return child;
 }
 
-int ListItem::row() const { return _row; };
-
-void ListItem::setRow(int row) { _row = row; }
-
-bool ListItem::setRowDb(int row)
+bool ListItem::setRow(int row)
 {
-    if (_row == row)
-        return true;
-    SqlQuery sql;
-    sql.prepare("UPDATE list_item SET weight = :weight WHERE id = :id");
-    sql.bindValue(":id", _id);
-    sql.bindValue(":weight", row);
-    if (sql.exec()) {
-        setRow(row);
-        return true;
-    }
-    return false;
+    return _row == row || _setAttribute("weight", row) && (_row = row, true);
 }
 
-void ListItem::adjustRow(int delta) { _row += delta; }
-
-QString ListItem::markdown() const { return _markdown; };
-
-void ListItem::setMarkdown(const QString& value)
+void ListItem::_setMarkdown(const QString& value)
 {
     _markdown = value;
     _html = renderer.convert(value);
@@ -193,17 +226,26 @@ void ListItem::setMarkdown(const QString& value)
     }
 }
 
-ListItem* ListItem::parent() const { return _parent; };
+bool ListItem::setMarkdown(const QString& markdown)
+{
+    return markdown == _markdown || _setAttribute("content", markdown) && (_setMarkdown(markdown), true);
+}
 
 void ListItem::setParent(ListItem* parent, int row)
 {
     _parent = parent;
-    if (parent)
+    if (parent) {
         setLevel(parent->level() + 1);
-    setRow(row);
+        setRow(row);
+        setModel(parent->model());
+    } else {
+        setLevel(0);
+        setRow(0);
+        setModel(nullptr);
+    }
 }
 
-bool ListItem::setParentDbOnly(ListItem* parent, int row)
+bool ListItem::setParentDb(ListItem* parent, int row)
 {
     if (parent == _parent && row == _row)
         return true;
@@ -241,8 +283,6 @@ bool ListItem::setParentDbOnly(ListItem* parent, int row)
     return success;
 }
 
-int ListItem::level() const { return _level; };
-
 void ListItem::setLevel(int level)
 {
     _level = level;
@@ -250,27 +290,13 @@ void ListItem::setLevel(int level)
         child->setLevel(level + 1);
 }
 
-bool ListItem::isExpanded() const { return _isExpanded; }
-
-void ListItem::setExpanded(bool isExpanded) { _isExpanded = isExpanded; }
-
-bool ListItem::setExpandedDb(bool isExpanded)
+bool ListItem::setExpanded(bool isExpanded)
 {
-    if (isExpanded == _isExpanded)
-        return true;
-    SqlQuery sql;
-    sql.prepare("UPDATE list_item SET is_expanded = :expanded WHERE id = :id");
-    sql.bindValue("expanded", isExpanded ? 1 : 0);
-    sql.bindValue("id", _id);
-    if (sql.exec()) {
-        setExpanded(isExpanded);
-        return true;
-    }
-    return false;
+    return isExpanded == _isExpanded ||
+           _setAttribute("is_expanded", isExpanded ? 1 : 0) && (_isExpanded = isExpanded, true);
 }
 
-bool ListItem::isCheckable() const { return _isCheckable; };
-void ListItem::setCheckable(const bool isCheckable)
+void ListItem::_setCheckable(const bool isCheckable)
 {
     _isCheckable = isCheckable;
     setFlag(Qt::ItemIsUserCheckable, isCheckable);
@@ -281,104 +307,154 @@ void ListItem::setCheckable(const bool isCheckable)
             setCancelled(false);
     }
 }
-bool ListItem::setCheckableDb(const bool isCheckable)
+
+bool ListItem::setCheckable(const bool isCheckable)
 {
     if (isCheckable == _isCheckable)
         return true;
 
     QSqlDatabase db = QSqlDatabase::database();
     bool localTrans = db.transaction();
-    bool success = true;
 
-    SqlQuery sql;
-    sql.prepare("UPDATE list_item SET is_checkable = :checkable WHERE id = :id");
-    sql.bindValue(":checkable", isCheckable ? 1 : 0);
-    sql.bindValue(":id", _id);
-    if (sql.exec()) {
-        setCheckable(isCheckable);
+    bool success = true;
+    if (_setAttribute("is_checkable", isCheckable ? 1 : 0)) {
+        _setCheckable(isCheckable);
         if (!isCheckable) {
             if (isCompleted())
-                success = setCompletedDb(false);
+                success = setCompleted(false);
             if (success)
                 if (isCancelled())
-                    success = setCancelledDb(false);
+                    success = setCancelled(false);
         }
     } else
         success = false;
 
     if (localTrans)
-        if (success)
-            db.commit();
-        else
-            db.rollback();
-
+        success ? db.commit() : db.rollback();
     return success;
 }
 
-bool ListItem::isCompleted() const { return _isCompleted; }
-void ListItem::setCompleted(const bool isCompleted) { _isCompleted = isCompleted; }
-bool ListItem::setCompletedDb(const bool isCompleted)
+bool ListItem::setCompleted(const bool isCompleted)
 {
-    if (isCompleted == _isCompleted)
-        return true;
-    SqlQuery sql;
-    sql.prepare("UPDATE list_item SET is_completed = :completed WHERE id = :id");
-    sql.bindValue(":completed", isCompleted);
-    sql.bindValue(":id", _id);
-    if (sql.exec()) {
-        setCompleted(isCompleted);
-        return true;
-    }
-    return false;
+    return isCompleted == _isCompleted ||
+           _setAttribute("is_completed", isCompleted ? 1 : 0) && (_isCompleted = isCompleted, true);
 }
 
-bool ListItem::isCancelled() const { return _isCancelled; }
-void ListItem::setCancelled(const bool isCancelled) { _isCancelled = isCancelled; }
-bool ListItem::setCancelledDb(const bool isCancelled)
+bool ListItem::setCancelled(const bool isCancelled)
 {
-    if (isCancelled == _isCancelled)
-        return true;
-    SqlQuery sql;
-    sql.prepare("UPDATE list_item SET is_cancelled = :cancelled WHERE id = :id");
-    sql.bindValue(":cancelled", isCancelled);
-    sql.bindValue(":id", _id);
-    if (sql.exec()) {
-        setCancelled(isCancelled);
-        return true;
-    }
-    return false;
+    return isCancelled == _isCancelled ||
+           _setAttribute("is_cancelled", isCancelled) && (_isCancelled = isCancelled, true);
 }
 
-bool ListItem::isProject() const { return _isProject; }
-void ListItem::setProject(const bool isProject) { _isProject = isProject; }
-bool ListItem::setProjectDb(const bool isProject)
+bool ListItem::setProject(const bool isProject)
 {
+    if (isProject) {
+        if (_isMilestone) {
+            emit operationError("Cannot set milestone as project");
+            return false;
+        }
+        if (!_parent) {
+            emit operationError("This item has no parent");
+            return false;
+        }
+        if (_parent->isMilestone()) {
+            emit operationError("A project cannot become a child of a milestone");
+            return false;
+        }
+        if (!(_parent->isRoot() || _parent->isProject())) {
+            emit operationError("Only a top level item or a direct child of another project can be set as a projet");
+            return false;
+        }
+        if (_isCheckable) {
+            emit operationError("Cannot set a checkable item as a project");
+            return false;
+        }
+    } else {
+        for (auto child : _children)
+            if (child->isProject() || child->isMilestone()) {
+                emit operationError("Cannot unset project: the project has a child marked as project or milestone");
+                return false;
+            }
+    }
+
     if (isProject == _isProject)
         return true;
-    SqlQuery sql;
-    sql.prepare("UPDATE list_item SET is_project = :project WHERE id = :id");
-    sql.bindValue(":project", isProject);
-    sql.bindValue(":id", _id);
-    if (sql.exec()) {
-        setProject(isProject);
+
+    if (_setAttribute("is_project", isProject)) {
+        _isProject = isProject;
+        if (isProject)
+            emit _model->projectAdded(this);
+        else
+            emit _model->projectRemoved();
         return true;
     }
     return false;
 }
 
-bool ListItem::isHighlighted() const { return _isHighlighted; }
-void ListItem::setHighlighted(const bool isHighlighted) { _isHighlighted = isHighlighted; }
-bool ListItem::setHighlightedDb(const bool isHighlighted)
+bool ListItem::setMilestone(const bool isMilestone)
 {
-    if (isHighlighted == _isHighlighted)
+    if (isMilestone) {
+        if (_isProject) {
+            emit operationError("Cannot set project as milestone");
+            return false;
+        }
+        if (!_parent || !_parent->isProject()) {
+            emit operationError("Milestone should be child of a project");
+            return false;
+        }
+        if (_isCheckable) {
+            emit operationError("Cannot set a checkable item as milestone");
+            return false;
+        }
+    }
+    if (isMilestone == _isMilestone)
         return true;
-    SqlQuery sql;
-    sql.prepare("UPDATE list_item SET is_highlighted = :highlighted WHERE id = :id");
-    sql.bindValue(":highlighted", isHighlighted ? 1 : 0);
-    sql.bindValue(":id", _id);
-    if (sql.exec()) {
-        _isHighlighted = isHighlighted;
+    if (_setAttribute("is_milestone", isMilestone)) {
+        _isMilestone = isMilestone;
+        if (_model)
+            emit isMilestone ? _model->projectAdded(this) : _model->projectRemoved();
         return true;
     }
     return false;
+}
+
+bool ListItem::setHighlighted(const bool isHighlighted)
+{
+    return isHighlighted == _isHighlighted || _setAttribute("is_highlighted", isHighlighted) && (_isHighlighted = isHighlighted, true);
+}
+
+bool ListItem::setDueDate(const QDate& dueDate)
+{
+    if (dueDate == _dueDate)
+        return true;
+    if (_setAttribute("due_date", dueDate.isValid() ? dueDate.toString(Qt::ISODate) : QVariant())) {
+        _dueDate = dueDate;
+        emit scheduleChanged();
+        return true;
+    }
+    return false;
+}
+
+bool ListItem::setPriority(int priority)
+{
+    if (_isMilestone) // milestone is ordered by date not priority
+        return false;
+    return priority == _priority || _setAttribute("priority", priority) && (_priority = priority, true);
+}
+
+bool ListItem::_setAttribute(const QString& column, QVariant value) const
+{
+    QString sql;
+    if (column == "content")
+        sql = QString("UPDATE list_item SET %1 = :%1, modified_at = CURRENT_TIMESTAMP WHERE id = :id").arg(column);
+    else if (column == "is_completed" || column == "is_cancelled")
+        sql = QString("UPDATE list_item SET %1 = :%1, completed_at = CURRENT_TIMESTAMP WHERE id = :id").arg(column);
+    else
+        sql = QString("UPDATE list_item SET %1 = :%1 WHERE id = :id").arg(column);
+
+    SqlQuery q;
+    q.prepare(sql);
+    q.bindValue(":id", _id);
+    q.bindValue(QStringLiteral(":") + column, value);
+    return q.exec();
 }

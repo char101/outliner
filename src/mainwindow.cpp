@@ -1,8 +1,7 @@
 #include "mainwindow.h"
+
+#include "aboutdialog.h"
 #include "utils.h"
-#include "listoutliner.h"
-#include "listmodel.h"
-#include "listtree.h"
 
 #include <QDebug>
 #include <QDesktopWidget>
@@ -12,97 +11,103 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QSqlQuery>
-#include <QStatusBar>
 #include <QToolBar>
 #include <QVBoxLayout>
 #include <QDockWidget>
+#include <QToolTip>
+#include <QApplication>
 
 MainWindow::MainWindow() : QMainWindow()
 {
-    menuVisible = true;
-    statusBarVisible = true;
+    _menuVisible = true;
+    _statusBarVisible = true;
 
-    setWindowTitle("Outliner");
-    setWindowIcon(Util::findIcon("app"));
+#ifdef QT_DEBUG
+    setWindowTitle("Taskware [DEBUG]");
+#else
+    setWindowTitle("Taskware");
+#endif
 
-    setupMenu();
-    setupStatusBar();
-    setupUi();
+    setWindowIcon(Util::findIcon("app", QList<int>{16}));
+
+    _list = new ListWidget(this);
+    _schedule = new ScheduleWidget(this);
+    _statusBar = statusBar();
+    _tabs = new QTabWidget(this);
+
+    _setupUi();
+    _setupDocks();
+
+    _setupMenu();
+    _setupStatusBar();
 }
 
-void MainWindow::setupMenu()
+void MainWindow::_setupMenu()
 {
     QMenuBar* menuBar = this->menuBar();
-    if (!menuVisible)
+    if (!_menuVisible)
         menuBar->hide();
 
-    QMenu* fileMenu = menuBar->addMenu("&File");
-    fileMenu->addAction("Exit");
+    QMenu* menu = nullptr;
+    QAction* action = nullptr;
+
+    menu = menuBar->addMenu("&File");
+    menu->addAction("Exit", this, SLOT(close()));
+
+    menu = menuBar->addMenu("&List");
+    action = menu->addAction("&Hide Completed", _list, SLOT(toggleHideCompleted()));
+    action->setCheckable(true);
+    action->setChecked(true);
+
+    menu->addSeparator();
+
+    menu->addAction("&Expand All", _list, SLOT(expandAll()));
+    menu->addAction("&Collapse All", _list, SLOT(collapseAll()));
+
+    menu = menuBar->addMenu("&Help");
+    menu->addAction("&About", this, SLOT(showAboutDialog()));
+    menu->addAction("About &Qt", this, SLOT(showAboutQtDialog()));
 }
 
-void MainWindow::setupUi()
+void MainWindow::_setupUi()
 {
-    tabWidget = new QTabWidget(this);
-    tabWidget->setStyleSheet("QTabWidget::pane { padding-bottom: 0 }");
-    tabWidget->tabBar()->hide();
+    _list->loadLists();
+    connect(_list, &ListWidget::operationError, [this](const QString& message) {
+        _statusBar->showMessage(message, 5000);
+    });
+    connect(_list, &ListWidget::scheduleChanged, _schedule, &ScheduleWidget::reload);
 
-    listWidget = new ListWidget(this);
-    tabWidget->addTab(listWidget, Util::findIcon("list"), "&Lists");
+    _tabs->setStyleSheet("QTabWidget::pane { padding-bottom: 0 }");
+    _tabs->addTab(_list, Util::findIcon("list"), "&Tasks");
+    _tabs->addTab(_schedule, Util::findIcon("schedule"), "&Schedule");
+    setCentralWidget(_tabs);
+}
 
-    // auto calendarTab = new QWidget;
-    // auto calendarLayout = new QVBoxLayout(calendarTab);
-    // calendarLayout->setContentsMargins(0, 0, 0, 0);
-    // tabWidget->addTab(calendarTab, QIcon(":calendar.png"), "&Schedule");
-    //
-    // auto pomodoroTab = new QWidget;
-    // auto pomodoroLayout = new QVBoxLayout(pomodoroTab);
-    // pomodoroLayout->setContentsMargins(0, 0, 0, 0);
-    // tabWidget->addTab(pomodoroTab, QIcon(":timer.png"), "&Timer");
-
-    setCentralWidget(tabWidget);
-
-    QDockWidget* leftDock = new QDockWidget("Outline", this);
+void MainWindow::_setupDocks()
+{
+    // QDockWidget* leftDock = new QDockWidget("Outline", this);
     // QVBoxLayout* leftLayout = new QVBoxLayout(leftWidget);
-    listOutliner = new ListOutliner(this);
-    leftDock->setWidget(listOutliner);
+    // listOutliner = new ListOutliner(this);
+    // leftDock->setWidget(listOutliner);
     // leftDock->setLayout(new QHBoxLayout());
-    addDockWidget(Qt::LeftDockWidgetArea, leftDock);
+    // addDockWidget(Qt::LeftDockWidgetArea, leftDock);
 
-    QDockWidget* rightDock = new QDockWidget("Schedule", this);
-    addDockWidget(Qt::LeftDockWidgetArea, rightDock);
+    // QDockWidget* rightDock = new QDockWidget("Schedule", this);
+    // addDockWidget(Qt::LeftDockWidgetArea, rightDock);
 
-    tabifyDockWidget(leftDock, rightDock);
-    leftDock->raise();
-
-    connect(listWidget, &ListWidget::listSelected, listOutliner, &ListOutliner::loadOutline);
-    connect(listOutliner->tree, &ListOutlinerTree::itemClickedAlt, [this](QTreeWidgetItem* item, int column) {
-        if (column == 0)
-            listWidget->scrollTo(item->data(0, Qt::UserRole).toInt());
-    });
-    connect(listOutliner->tree, &ListOutlinerTree::itemDoubleClickedAlt, [this](QTreeWidgetItem* item, int column) {
-        if (column == 0)
-            listWidget->zoomTo(item->data(0, Qt::UserRole).toInt());
-    });
-
-    listWidget->loadLists();
-    for (auto tree : listWidget->trees()) {
-        connect(tree, &ListTree::itemIsProject, [this](ListItem* item) {
-            Q_UNUSED(item);
-            listOutliner->loadOutline(listWidget->currentListId());
-        });
-    }
+    // tabifyDockWidget(leftDock, rightDock);
+    // leftDock->raise();
 }
 
-void MainWindow::setupStatusBar()
+void MainWindow::_setupStatusBar()
 {
-    QStatusBar* statusBar = this->statusBar();
-    if (!statusBarVisible)
-        statusBar->hide();
+    if (!_statusBarVisible)
+        _statusBar->hide();
 }
 
 void MainWindow::setDatabasePath(const QString& dbPath)
 {
-    statusBar()->addWidget(new QLabel(dbPath));
+    _statusBar->addPermanentWidget(new QLabel(dbPath));
 }
 
 QSize MainWindow::sizeHint() const
@@ -111,13 +116,23 @@ QSize MainWindow::sizeHint() const
     QRect primaryScreenSize = widget.availableGeometry(widget.primaryScreen());
     const int width = qMin(640, primaryScreenSize.width());
     const int height = primaryScreenSize.height();
-
     return QSize(width, height);
 }
 
 void MainWindow::keyPressEvent(QKeyEvent* key)
 {
-    if (key->key() == Qt::Key_Escape) {
+    if (key->key() == Qt::Key_Escape)
         close();
-    }
+    QMainWindow::keyPressEvent(key);
+}
+
+void MainWindow::showAboutDialog()
+{
+    AboutDialog aboutDialog;
+    aboutDialog.exec();
+}
+
+void MainWindow::showAboutQtDialog()
+{
+    QApplication::aboutQt();
 }

@@ -1,14 +1,6 @@
 #pragma once
 
-#include <QString>
-#include <QVariant>
+#include <QSettings>
 
-class Settings
-{
-public:
-    static void load();
-    int getInt(const QString& key);
-    QString getString(const QString& key);
-private:
-    QHash<QString, QVariant> settings;
-};
+extern QSettings settings;
+extern QHash<QString, QVariant> runtimeSettings;

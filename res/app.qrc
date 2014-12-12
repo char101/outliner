@@ -2,7 +2,16 @@
 <RCC version="1.0">
  <qresource>
    <file>app.png</file>
+   <file>app16.png</file>
+
    <file>list.png</file>
+   <file>schedule.png</file>
+
    <file>sort.png</file>
- </qresource>
+
+   <file>project.png</file>
+   <file>milestone.png</file>
+
+   <file alias="CREDITS.md">../CREDITS.md</file>
+  </qresource>
 </RCC>

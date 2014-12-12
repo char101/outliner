@@ -13,6 +13,7 @@ enum SortMode { SortByStatus, SortByStatusAndContent };
 enum AppendMode { AppendChild, AppendBefore, AppendAfter };
 enum ItemState { CheckableState, CompletedState, CancelledState, ProjectState, HighlightedState };
 
-const QColor HighlightBackgroundColor = QColor(Qt::yellow);
-const QColor ProjectBackgroundColor = QColor::fromHsv(200, 80, 255);
+extern const QColor HighlightBackgroundColor;
+extern const QColor ProjectBackgroundColor;
+extern const QColor MilestoneBackgroundColor;
 }

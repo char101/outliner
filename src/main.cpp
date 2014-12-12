@@ -1,5 +1,8 @@
 #include "mainwindow.h"
+
 #include "databaseutil.h"
+#include "settings.h"
+#include "debug.h"
 
 #include <QApplication>
 #include <QCommandLineParser>
@@ -7,17 +10,8 @@
 #include <QDir>
 #include <QIcon>
 #include <QMessageBox>
-#include <QFontDatabase>
 #include <QSqlQuery>
-
-void loadCustomFonts()
-{
-    QDir fontsDir("fonts");
-    if (fontsDir.exists())
-        for (QString fontFile : fontsDir.entryList(QDir::Files))
-            if (fontFile.endsWith(".ttf") || fontFile.endsWith(".otf"))
-                QFontDatabase::addApplicationFont(fontsDir.filePath(fontFile));
-}
+#include <QtPlugin>
 
 void clearDb(const QString& dbPath)
 {
@@ -38,6 +32,8 @@ int main(int argc, char *argv[])
 
     QCommandLineParser parser;
     parser.addPositionalArgument("db", "Database path");
+    QCommandLineOption themeOpt("t", "Icons theme directory", "theme");
+    parser.addOption(themeOpt);
     parser.process(app);
 
     const QStringList args = parser.positionalArguments();
@@ -46,23 +42,30 @@ int main(int argc, char *argv[])
     if (args.length() > 0)
         dbPath = args[0];
     else {
+#ifdef QT_DEBUG
+        dbPath = "Q:\\Outliner\\test.sqlite";
+#else
         dbPath = app.applicationDirPath() + "/" + "outline.sqlite";
-// #ifdef QT_DEBUG
-//         clearDb(dbPath);
-// #endif
+#endif
     }
 
-    qDebug() << "Database path" << dbPath;
+    if (parser.isSet(themeOpt))
+        runtimeSettings["theme"] = parser.value(themeOpt);
+    else {
+        QDir iconsDir("icons");
+        if (iconsDir.exists())
+            runtimeSettings["theme"] = "icons";
+    }
 
     QDir::setCurrent(QFileInfo(dbPath).absoluteDir().path());
-    // loadCustomFonts();
+    // Util::loadCustomFonts();
 
     auto db = QSqlDatabase::addDatabase("QSQLITE");
     db.setDatabaseName(dbPath);
     db.open();
 
-    // without this, sqlite operation is very slow
-    db.exec("PRAGMA synchronous = OFF");
+    db.exec("PRAGMA journal_mode = WAL"); // write once to the wal log, merge on exit
+    db.exec("PRAGMA synchronous = NORMAL"); // sync on checkpoint
 
     DatabaseUtil dbUtil(dbPath);
     if (dbUtil.initialize()) {

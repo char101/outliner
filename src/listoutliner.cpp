@@ -3,47 +3,57 @@
 
 #include <QDebug>
 
+MarkdownRenderer ListOutliner::_renderer{};
+
 ListOutliner::ListOutliner(QWidget* parent) : QWidget(parent)
 {
-    layout = new QVBoxLayout(this);
-    layout->setContentsMargins(0, 0, 0, 0);
-    tree = new ListOutlinerTree(this);
-    tree->setHeaderHidden(true);
-    layout->addWidget(tree);
+    _tree = new ListOutlinerTree(this);
+
+    _layout = new QVBoxLayout(this);
+    _layout->setContentsMargins(0, 0, 0, 0);
+    _layout->addWidget(_tree);
 }
 
 void ListOutliner::loadOutline(int listId)
 {
     if (listId == 0)
         return;
-    tree->clear();
-    loadOutlineInner(listId);
-    tree->expandAll();
+
+    _currentListId = listId;
+
+    _tree->clear();
+    _loadOutline();
+    _tree->expandAll();
 }
 
-void ListOutliner::loadOutlineInner(int listId, int parentId, QTreeWidgetItem* parent)
+void ListOutliner::reloadOutline()
+{
+    _tree->clear();
+    _loadOutline();
+    _tree->expandAll();
+}
+
+void ListOutliner::_loadOutline(int parentId, QTreeWidgetItem* parent)
 {
     SqlQuery sql;
-    sql.prepare("SELECT id, content FROM list_item WHERE list_id = :list AND parent_id = :parent AND is_project = 1 ORDER BY weight ASC");
-    sql.bindValue(":list", listId);
+    sql.prepare("SELECT id, content FROM list_item WHERE list_id = :list AND parent_id = :parent AND (is_project = 1 OR is_milestone = 1) ORDER BY weight ASC");
+    sql.bindValue(":list", _currentListId);
     sql.bindValue(":parent", parentId);
     if (!sql.exec())
         return;
     while (sql.next()) {
-        int id = sql.value(0).toInt();
-        QString content = sql.value(1).toString();
-        QTreeWidgetItem* item = new QTreeWidgetItem(QStringList(content));
+        int c = -1;
+
+        int id = sql.value(++c).toInt();
+        QString content = sql.value(++c).toString();
+        QString markdown = _renderer.convert(content);
+
+        QTreeWidgetItem* item = new QTreeWidgetItem(QStringList(markdown));
         item->setData(0, Qt::UserRole, id);
         if (!parent)
-            tree->addTopLevelItem(item);
+            _tree->addTopLevelItem(item);
         else
             parent->addChild(item);
-        loadOutlineInner(listId, id, item);
+        _loadOutline(id, item);
     }
-}
-
-QSize ListOutliner::sizeHint() const
-{
-    QSize size = QWidget::sizeHint();
-    return QSize(100, size.height());
 }

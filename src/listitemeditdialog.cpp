@@ -1,107 +1,104 @@
 #include "listitemeditdialog.h"
 #include "sqlquery.h"
 #include "constants.h"
+#include "utils.h"
 
 #include <QPushButton>
 #include <QTabBar>
 #include <QDebug>
 #include <QTimer>
+#include <QFormLayout>
+#include <QMessageBox>
 
-ListItemEditDialog::ListItemEditDialog(QWidget* parent) : QDialog(parent)
+ListItemEditDialog::ListItemEditDialog(QWidget* parent, const QString& title) : QDialog(parent)
 {
     setWindowIcon(QIcon(":app.png"));
+    if (!title.isNull())
+        setWindowTitle(title);
 
-    layout = new QVBoxLayout(this);
-    layout->setContentsMargins(0, 0, 0, 0);
+    _calendarWidget = new CalendarWidget(this);
 
-    tabWidget = new QTabWidget(this);
-    layout->addWidget(tabWidget);
+    _layout = new QVBoxLayout(this);
+    _layout->setContentsMargins(0, 0, 0, 0);
 
-    setupSimpleEditorTab();
-    setupTextEditorTab();
+    _tabWidget = new QTabWidget(this);
+    _layout->addWidget(_tabWidget);
 
-    setupButtons();
+    _setupSimpleEditorTab();
+    _setupTextEditorTab();
 
-    statusBar = new QStatusBar(this);
-    layout->addWidget(statusBar);
+    _setupAttributes();
 
-    simpleEditor->setFocus(Qt::MouseFocusReason);
+    _setupButtons();
+
+    _simpleEditor->setFocus(Qt::MouseFocusReason);
 }
 
-void ListItemEditDialog::setupSimpleEditorTab()
+void ListItemEditDialog::_setupSimpleEditorTab()
 {
     auto widget = new QWidget;
     auto widgetLayout = new QVBoxLayout(widget);
 
-    simpleEditor = new QLineEdit();
-    widgetLayout->addWidget(simpleEditor);
+    _simpleEditor = new QLineEdit();
+    widgetLayout->addWidget(_simpleEditor);
 
-    tabWidget->addTab(widget, "Simple Editor");
+    _tabWidget->addTab(widget, "Simple Editor");
 }
 
-void ListItemEditDialog::setupTextEditorTab()
+void ListItemEditDialog::_setupTextEditorTab()
 {
-    textEditor = new QPlainTextEdit(this);
-    tabWidget->addTab(textEditor, "Text Editor");
+    _textEditor = new QPlainTextEdit(this);
+    _tabWidget->addTab(_textEditor, "Text Editor");
 }
 
-void ListItemEditDialog::setupButtons()
+void ListItemEditDialog::_setupAttributes()
+{
+    _dueDateEdit = new DateEdit(this);
+    _dueDateEdit->setDisplayFormat("dd MMM yyyy");
+    _dueDateEdit->setCalendarPopup(true);
+    _dueDateEdit->setCalendarWidget(_calendarWidget);
+    _dueDateEdit->setDate(QDate::currentDate());
+    _dueDateEdit->setMinimumDate(QDate::currentDate());
+
+    _dueDateCheck = new QCheckBox(this);
+
+    auto layout = new QFormLayout();
+    layout->setContentsMargins(10, 5, 10, 5);
+    layout->setFieldGrowthPolicy(QFormLayout::FieldsStayAtSizeHint);
+
+    auto dueDateLayout = new QHBoxLayout();
+    dueDateLayout->setContentsMargins(0, 0, 0, 0);
+    dueDateLayout->addWidget(_dueDateEdit);
+    dueDateLayout->addWidget(_dueDateCheck);
+
+    connect(_dueDateEdit, &QDateEdit::dateChanged, [this](const QDate& date) {
+        Q_UNUSED(date);
+        _dueDateCheck->setCheckState(Qt::Checked);
+    });
+
+    layout->addRow("Due Date", dueDateLayout);
+
+    _layout->addLayout(layout);
+}
+
+void ListItemEditDialog::_setupButtons()
 {
     auto buttonBoxLayout = new QHBoxLayout;
     buttonBoxLayout->setContentsMargins(5, 0, 5, 5);
-    layout->addLayout(buttonBoxLayout);
+    _layout->addLayout(buttonBoxLayout);
 
-    buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
-    connect(buttonBox, &QDialogButtonBox::accepted, this, &ListItemEditDialog::accept);
-    connect(buttonBox, &QDialogButtonBox::rejected, this, &ListItemEditDialog::reject);
-    buttonBoxLayout->addWidget(buttonBox);
+    _buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
+    connect(_buttonBox, &QDialogButtonBox::accepted, this, &ListItemEditDialog::accept);
+    connect(_buttonBox, &QDialogButtonBox::rejected, this, &ListItemEditDialog::reject);
+    buttonBoxLayout->addWidget(_buttonBox);
 }
 
 QSize ListItemEditDialog::sizeHint() const
 {
     int width = 600;
-    int height = tabWidget->tabBar()->height() + simpleEditor->height() + buttonBox->height();
+    int height = _tabWidget->tabBar()->height() + _simpleEditor->height() + _buttonBox->height();
 
     return QSize(width, height);
-}
-
-QString ListItemEditDialog::text() const
-{
-    int tab = tabWidget->currentIndex();
-    QString text;
-    if (tab == App::SimpleEditorTab)
-        text = simpleEditor->text();
-    else
-        text = textEditor->toPlainText();
-    return text.trimmed();
-}
-
-QDateTime ListItemEditDialog::datetime() const
-{
-    return QDateTime::currentDateTime();
-}
-
-void ListItemEditDialog::setText(QString value)
-{
-    textEditor->setPlainText(value);
-
-    if (isSimpleText(value)) {
-        simpleEditor->setText(value);
-        if (!tabWidget->isTabEnabled(App::SimpleEditorTab))
-            tabWidget->setTabEnabled(App::SimpleEditorTab, true);
-        simpleEditor->setFocus(Qt::MouseFocusReason);
-    } else {
-        tabWidget->setTabEnabled(App::SimpleEditorTab, false);
-    }
-}
-
-void ListItemEditDialog::done(int r)
-{
-    if (r == QDialog::Accepted && text().isEmpty()) {
-        statusBar->showMessage("Content is required");
-        return;
-    }
-    QDialog::done(r);
 }
 
 void ListItemEditDialog::keyPressEvent(QKeyEvent* event)
@@ -113,7 +110,65 @@ void ListItemEditDialog::keyPressEvent(QKeyEvent* event)
     QDialog::keyPressEvent(event);
 }
 
-bool ListItemEditDialog::isSimpleText(const QString& text) const
+void ListItemEditDialog::done(int r)
+{
+    if (r == QDialog::Accepted && text().isEmpty()) {
+        QMessageBox::warning(this, "Error", "Content is required");
+        return;
+    }
+    QDialog::done(r);
+}
+
+QString ListItemEditDialog::text() const
+{
+    int tab = _tabWidget->currentIndex();
+    QString text;
+    if (tab == App::SimpleEditorTab)
+        text = _simpleEditor->text();
+    else
+        text = _textEditor->toPlainText();
+    return text.trimmed();
+}
+
+void ListItemEditDialog::setText(QString value)
+{
+    _textEditor->setPlainText(value);
+
+    if (_isSimpleText(value)) {
+        _simpleEditor->setText(value);
+        if (!_tabWidget->isTabEnabled(App::SimpleEditorTab))
+            _tabWidget->setTabEnabled(App::SimpleEditorTab, true);
+        _simpleEditor->setFocus(Qt::MouseFocusReason);
+    } else {
+        _tabWidget->setTabEnabled(App::SimpleEditorTab, false);
+    }
+}
+
+QDate ListItemEditDialog::dueDate() const
+{
+    QString text = this->text();
+    if (text.contains('@')) {
+        QString part = text.section('@', -1);
+        QDate ret = Util::parseDate(part);
+        if (ret.isValid())
+            return ret;
+    }
+
+    if (_dueDateCheck->checkState() == Qt::Checked)
+        return _dueDateEdit->date();
+
+    return QDate();
+}
+
+void ListItemEditDialog::setDueDate(QDate date)
+{
+    if (date.isValid()) {
+        _dueDateEdit->setDate(date);
+        _dueDateCheck->setCheckState(Qt::Checked);
+    }
+}
+
+bool ListItemEditDialog::_isSimpleText(const QString& text) const
 {
     return text.indexOf('\n') == -1 && text.indexOf('\r') == -1;
 }

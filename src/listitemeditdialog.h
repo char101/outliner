@@ -1,5 +1,8 @@
 #pragma once
 
+#include "dateedit.h"
+#include "calendarwidget.h"
+
 #include <QDialog>
 #include <QLineEdit>
 #include <QPlainTextEdit>
@@ -7,29 +10,39 @@
 #include <QVBoxLayout>
 #include <QDialogButtonBox>
 #include <QStatusBar>
-#include <QDateTime>
+#include <QDate>
+#include <QDateEdit>
+#include <QCheckBox>
 
 class ListItemEditDialog : public QDialog
 {
     Q_OBJECT
 public:
-    ListItemEditDialog(QWidget* parent = 0);
+    ListItemEditDialog(QWidget* parent = 0, const QString& title = QString());
     QSize sizeHint() const;
-    QString text() const;
-    QDateTime datetime() const;
-    void setText(QString value);
     void keyPressEvent(QKeyEvent* event);
     void done(int r);
+
+    QString text() const;
+    void setText(QString value);
+
+    QDate dueDate() const;
+    void setDueDate(QDate date);
 private:
-    QVBoxLayout* layout;
-    QTabWidget* tabWidget;
-    QLineEdit* simpleEditor;
-    QPlainTextEdit* textEditor;
-    QDialogButtonBox* buttonBox;
-    QStatusBar* statusBar;
-    bool isModified;
-    void setupSimpleEditorTab();
-    void setupTextEditorTab();
-    void setupButtons();
-    bool isSimpleText(const QString& text) const;
+    QVBoxLayout* _layout;
+    QTabWidget* _tabWidget;
+    QLineEdit* _simpleEditor;
+    QPlainTextEdit* _textEditor;
+
+    DateEdit* _dueDateEdit;
+    QCheckBox* _dueDateCheck;
+    CalendarWidget* _calendarWidget;
+
+    QDialogButtonBox* _buttonBox;
+    bool _isModified;
+    void _setupSimpleEditorTab();
+    void _setupTextEditorTab();
+    void _setupAttributes();
+    void _setupButtons();
+    bool _isSimpleText(const QString& text) const;
 };
