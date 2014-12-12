@@ -33,6 +33,10 @@ Currently a simple task outliner.
 * Unzoom (`Z` or `Backspace`) or click on the breadcrumb
 * `Enter` or `Double click` - zoom if current item is a project/milestone, edit otherwise
 
+### Structure Outliner
+
+On the left of the outliner is the tree showing structure of the outline. Only items marked as project/milestone will appear on the tree.
+
 ## Screenshot
 
 ![Screnshot](http://char101.github.io/outliner/images/screenshot.png)
