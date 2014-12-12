@@ -33,7 +33,11 @@ Currently a simple task outliner.
 * Unzoom (`Z` or `Backspace`) or click on the breadcrumb
 * `Enter` or `Double click` - zoom if current item is a project/milestone, edit otherwise
 
+## Screenshot
+
 ![Screnshot](http://char101.github.io/outliner/images/screenshot.png)
+
+![Screnshot](http://char101.github.io/outliner/images/screenshot2.png)
 
 ## Downloads
 
