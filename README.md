@@ -1,40 +1,42 @@
-char101/Outliner
+Taskware
 ================
 
-Project status: alpha | Usable: yes | Bugs: most likely
+Currently a simple task outliner.
 
 ## Overview
 
-* Data is stored in a sqlite database
-* Portable, can be built statically as a single executable
-* Theoretically cross-platform
-* Can zoom/unzoom specific item (set a specific item as the root of the outline) - with breadcrumb navigation
-* Optional checkbox for each item
-* Highlight a specific item (e.g. for marking currently executed task)
-* Each item is rendered using markdown (with [hoedown](https://github.com/hoedown/hoedown))
+* Data is stored in a sqlite database so you can easily access it with your own favorite language if needed.
+* Portable
+* Cross-platform as supported by Qt.
+
+## Outliner
+
+* Tree outliner
+  * Add sibling after current item (`Insert` or `a`)
+  * Add sibling before current item (`Alt + Insert` or `A`)
+  * Add child (`Ctrl + Insert` or `b`)
+  * Delete item (`Del` or `d`)
+  * Edit item (`F2` or `e`)
+  * Increase item indent (`Ctrl + Right`)
+  * Decrease item indent (`Ctrl + Left`)
+  * Move item up/down (`Ctrl + Up/Down`)
+* Set item checkable (`c`)
+* Toggle item completed status (`Space`) or just check/uncheck the checkbox
+* Toggle item cancelled status (`c`)
+* Set item as project (`p`)
+* Set item as milestone (`m`)
+* Highlight item (`h`)
+* Set item priority (`1` or `2` or `3` or `0` - no priority)
+* Sort children (`s`) - children items will be sorted by priority and completed status
+* Zoom - make current child root of the tree (`z`)
+* Unzoom (`Z` or `Backspace`) or click on the breadcrumb
+* `Enter` or `Double click` - zoom if current item is a project/milestone, edit otherwise
 
 ![Screnshot](http://char101.github.io/outliner/images/screenshot.png)
 
-## [Downloads](https://github.com/char101/outliner/releases/)
+## Downloads
 
-## Keyboard Bindings
-
-* `Z` zoom
-* `z` unzoom
-* `c` show/hide checkbox
-* `space` toggle checked state
-* `h` toggle highlight
-* `del` delete item
-* `insert` append sibling
-* `ctrl+insert` append child
-* `ctrl+up/ctrl+down` move item up/down
-* `ctrl+left/ctrl-right` move item left/right
-* `F2/enter` Edit item
-
-## Mouse Bindings
-
-* Double click  
-  On leaf node it will open the editor, otherwise zoom to the item
+[Static single file windows exe](https://github.com/char101/outliner/releases/)
 
 ## Standard QTreeView Key Bindings
 
@@ -63,7 +65,6 @@ Project status: alpha | Usable: yes | Bugs: most likely
 * `F2`  
   In editable models, this opens the current item for editing. The Escape key can be used to cancel the editing process and revert any changes to the data displayed.
 
-## Future Plan
+## Other
 
-* Schedule view - shows the list of task for each day based on the date set in the outline
-* Timer view - similar to a pomodoro timer for currently executed task
+* Compiling this app requires `Qt 5.4.0` and a C++ compiler that supports `C++11` standard.

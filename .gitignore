@@ -11,5 +11,4 @@ Makefile*
 *.user
 *.bat
 *_plugin_import.cpp
-*.sqlite
-*.sqlite.*
+*.sqlite*
