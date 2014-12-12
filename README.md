@@ -8,6 +8,7 @@ Currently a simple task outliner.
 * Data is stored in a sqlite database so you can easily access it with your own favorite language if needed.
 * Portable
 * Cross-platform as supported by Qt.
+* Item text is rendered as markdown using [hoedown](https://github.com/hoedown/hoedown)
 
 ## Outliner
 
