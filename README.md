@@ -21,15 +21,15 @@ Currently a simple task outliner.
   * Increase item indent (`Ctrl + Right`)
   * Decrease item indent (`Ctrl + Left`)
   * Move item up/down (`Ctrl + Up/Down`)
-* Set item checkable (`c`)
+* Toggle item checkable (`c`)
 * Toggle item completed status (`Space`) or just check/uncheck the checkbox
 * Toggle item cancelled status (`c`)
-* Set item as project (`p`)
-* Set item as milestone (`m`)
+* Toggle item project status (`p`)
+* Toggle item milestone status (`m`)
 * Highlight item (`h`)
 * Set item priority (`1` or `2` or `3` or `0` - no priority) - the priority is shown as a color bar on the left of the task
 * Sort children (`s`) - children items will be sorted by priority and completed status
-* Zoom - make current child root of the tree (`z`)
+* Zoom - make current item root of the tree (`z`)
 * Unzoom (`Z` or `Backspace`) or click on the breadcrumb
 * `Enter` or `Double click` - zoom if current item is a project/milestone, edit otherwise
 
