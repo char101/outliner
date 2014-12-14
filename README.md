@@ -77,3 +77,10 @@ On the left of the outliner is the tree showing structure of the outline. Only i
 ## Other
 
 * Compiling this app requires `Qt 5.4.0` and a C++ compiler that supports `C++11` standard.
+
+```
+> mkdir 3rdparty
+> git clone --depth=1 https://github.com/hoedown/hoedown 3rdparty/hoedown
+> qmake
+> (n)make release
+```
