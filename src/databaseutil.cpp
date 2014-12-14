@@ -6,8 +6,16 @@
 #include <QFileInfo>
 #include <QDir>
 
-DatabaseUtil::DatabaseUtil(const QString& dbPath): dbPath(dbPath), failed(false)
+DatabaseUtil::DatabaseUtil(const QString& dbPath): _dbPath(dbPath), _failed(false)
 {
+    _dbExists = QFile::exists(dbPath);
+
+    QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE");
+    db.setDatabaseName(dbPath);
+    db.open();
+
+    db.exec("PRAGMA journal_mode = WAL"); // write once to the wal log, merge on exit
+    db.exec("PRAGMA synchronous = NORMAL"); // sync on checkpoint
 }
 
 bool DatabaseUtil::initialize()
@@ -15,7 +23,7 @@ bool DatabaseUtil::initialize()
     if (!tableExists("version")) {
         runSql("CREATE TABLE version (value INTEGER NOT NULL)");
         runSql("INSERT INTO version VALUES (1)");
-        if (failed)
+        if (_failed)
             return false;
     }
     return migrate();
@@ -137,10 +145,10 @@ bool DatabaseUtil::migrate()
             setVersion(db, 15);
     }
 
-    if (!failed)
+    if (!_failed)
         db.commit(); // close the transaction opened by the last setVersion
 
-    return !failed;
+    return !_failed;
 }
 
 int DatabaseUtil::version()
@@ -155,11 +163,11 @@ int DatabaseUtil::version()
 void DatabaseUtil::setVersion(QSqlDatabase& db, int value)
 {
 #ifndef QT_DEBUG
-    if (!failed)
+    if (!_failed && _dbExists)
         backup(); // backup previous database version if there is no error in migration
 #endif
 
-    if (failed) {
+    if (_failed) {
         qDebug() << "Database change version" << value << "rolled back";
         db.rollback();
         return;
@@ -169,7 +177,7 @@ void DatabaseUtil::setVersion(QSqlDatabase& db, int value)
     sql.prepare("UPDATE version SET value = :value");
     sql.bindValue(":value", value);
     if (!sql.exec())
-        failed = true;
+        _failed = true;
 
     db.commit();
 
@@ -179,13 +187,13 @@ void DatabaseUtil::setVersion(QSqlDatabase& db, int value)
 
 void DatabaseUtil::runSql(const QString& sql)
 {
-    if (failed)
+    if (_failed)
         return;
 
     SqlQuery query;
     query.prepare(sql);
     if (!query.exec())
-        failed = true;
+        _failed = true;
 }
 
 bool DatabaseUtil::tableExists(const QString& name)
@@ -199,16 +207,16 @@ bool DatabaseUtil::tableExists(const QString& name)
 
 void DatabaseUtil::backup()
 {
-    QFileInfo info(dbPath);
+    QFileInfo info(_dbPath);
 
-    QString newPath = QString("%0/%1.v%2.sqlite").arg(info.dir().path()).arg(info.baseName()).arg(version());
+    QString newPath = QString("%0/%1.backup-v%2.sqlite").arg(info.dir().path()).arg(info.baseName()).arg(version());
     if (QFile(newPath).exists())
         return;
 
-    QFile dbFile(dbPath);
+    QFile dbFile(_dbPath);
     if (!dbFile.copy(newPath)) {
-        failed = true;
-        qDebug() << "Failed backing up database file to" << newPath;
+        _failed = true;
+        qDebug() << "_failed backing up database file to" << newPath;
     }
 }
 
@@ -229,16 +237,16 @@ void DatabaseUtil::dropColumn(const QString& table, const QStringList& columns)
 
 void DatabaseUtil::migrateTable(const QString& table, const QStringList& droppedColumns)
 {
-    if (failed)
+    if (_failed)
         return;
 
-    if (!migrateTableInner(table, droppedColumns))
-        failed = true;
+    if (!_migrateTableInner(table, droppedColumns))
+        _failed = true;
 }
 
 // remove droppped columns
 // automatically migrate column_new to column
-bool DatabaseUtil::migrateTableInner(const QString& table, const QStringList& droppedColumns)
+bool DatabaseUtil::_migrateTableInner(const QString& table, const QStringList& droppedColumns)
 {
     SqlQuery sql;
 

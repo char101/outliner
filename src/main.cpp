@@ -60,13 +60,6 @@ int main(int argc, char *argv[])
     QDir::setCurrent(QFileInfo(dbPath).absoluteDir().path());
     // Util::loadCustomFonts();
 
-    auto db = QSqlDatabase::addDatabase("QSQLITE");
-    db.setDatabaseName(dbPath);
-    db.open();
-
-    db.exec("PRAGMA journal_mode = WAL"); // write once to the wal log, merge on exit
-    db.exec("PRAGMA synchronous = NORMAL"); // sync on checkpoint
-
     DatabaseUtil dbUtil(dbPath);
     if (dbUtil.initialize()) {
         MainWindow win;

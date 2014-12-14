@@ -26,5 +26,6 @@ public:
 private:
     bool _failed{false};
     QString _dbPath;
+    bool _dbExists{false};
     bool _migrateTableInner(const QString& table, const QStringList& droppedColumns);
 };
