@@ -6,7 +6,6 @@
 #include <QDir>
 #include <QFile>
 #include <QDate>
-#include <QDebug>
 #include <QFontDatabase>
 
 namespace Util
@@ -16,10 +15,8 @@ namespace Util
     static QIcon _findIcon(const QString& file)
     {
         if (runtimeSettings.contains("theme")) {
-            QDEBUG << runtimeSettings["theme"].toString();
             QDir iconsDir(runtimeSettings["theme"].toString());
             if (iconsDir.exists() && iconsDir.exists(file)) {
-                QDEBUG << iconsDir.filePath(file);
                 return QIcon(iconsDir.filePath(file));
             }
         }
