@@ -1,12 +1,7 @@
-/!archive
-/!icons
-/!snippets
 /build
 /3rdparty/hoedown
-/fonts
 /gh-pages
-/screenshot
-/themes
+/misc
 Makefile*
 *.user
 *.bat
