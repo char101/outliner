@@ -12,3 +12,4 @@ Makefile*
 *.bat
 *_plugin_import.cpp
 *.sqlite*
+*.pdb
