@@ -29,8 +29,10 @@ CONFIG(release, release|debug) {
 	# QT_NO_DEBUG disable Q_ASSERT
 	# QT_NO_DEBUG_OUTPUT disable qDebug
 	DEFINES += QT_NO_DEBUG QT_NO_DEBUG_OUTPUT
-	QMAKE_CXXFLAGS += /GL
-	QMAKE_LFLAGS += /LTCG
+	win32 {
+		QMAKE_CXXFLAGS += /GL /Zi /Zc:strictStrings
+		QMAKE_LFLAGS += /LTCG /DEBUG
+	}
 	DESTDIR = build/release
 	OBJECTS_DIR = build/release/obj
 	MOC_DIR = build/release/moc
