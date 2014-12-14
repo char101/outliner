@@ -18,7 +18,7 @@ signals:
 protected:
     void resizeEvent(QResizeEvent* event);
 private:
-    bool _preventItemClicked; // prevent item click just after double click
-    ListOutlinerItemDelegate* _delegate;
+    bool _preventItemClicked{false}; // prevent item click just after double click
+    ListOutlinerItemDelegate* _delegate{nullptr};
     QTimer _resizeTimer;
 };

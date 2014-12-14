@@ -13,6 +13,6 @@ public:
     ~MarkdownRenderer();
     QString convert(const QString& input) const;
 private:
-    hoedown_renderer* renderer;
-    hoedown_document* document;
+    hoedown_renderer* renderer{nullptr};
+    hoedown_document* document{nullptr};
 };

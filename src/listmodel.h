@@ -53,8 +53,8 @@ signals:
     void scheduleChanged();
     void operationError(const QString& message);
 private:
-    int _listId;
-    ListItem* _root;
+    int _listId{0};
+    ListItem* _root{nullptr};
 
     void _loadItems(ListItem* parent);
     QModelIndex _appendAfter(ListItem* item, const QString& content, App::AppendMode mode);

@@ -39,7 +39,9 @@ private:
     CalendarWidget* _calendarWidget;
 
     QDialogButtonBox* _buttonBox;
-    bool _isModified;
+
+    bool _isModified{false};
+
     void _setupSimpleEditorTab();
     void _setupTextEditorTab();
     void _setupAttributes();

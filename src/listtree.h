@@ -53,8 +53,8 @@ protected:
     void resizeEvent(QResizeEvent* event) override;
     void drawBranches(QPainter *painter, const QRect &rect, const QModelIndex &index) const override;
 private:
-    int _listId;
-    ListItemDelegate* _itemDelegate;
+    int _listId{0};
+    ListItemDelegate* _itemDelegate{nullptr};
     QTimer _resizeTimer;
 
     bool _isHidingCompleted{false};

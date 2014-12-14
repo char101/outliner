@@ -9,7 +9,7 @@
 
 const MarkdownRenderer ListItem::renderer{};
 
-ListItem::ListItem(ListModel* model, int listId) : QObject(), _listId(listId)
+ListItem::ListItem(ListModel* model, int listId) : QObject(), _listId(listId), _isRoot(true)
 {
     setModel(model);
 }

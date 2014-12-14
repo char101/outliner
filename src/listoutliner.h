@@ -18,9 +18,10 @@ public slots:
     void loadOutline(int listId);
     void reloadOutline();
 private:
-    QVBoxLayout* _layout;
-    ListOutlinerTree* _tree;
-    int _currentListId;
+    QVBoxLayout* _layout{nullptr};
+    ListOutlinerTree* _tree{nullptr};
+    int _currentListId{0};
+
     static MarkdownRenderer _renderer;
 
     void _loadOutline(int parentId = 0, QTreeWidgetItem* parent = 0);

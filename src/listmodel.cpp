@@ -101,7 +101,11 @@ QModelIndex ListModel::parent(const QModelIndex& index) const
     if (!index.isValid()) // root
         return QModelIndex();
 
-    ListItem* parent = itemFromIndex(index)->parent();
+    ListItem* item = itemFromIndex(index);
+    if (!item)
+        return QModelIndex();
+
+    ListItem* parent = item->parent();
     if (parent->isRoot()) // top level item
         return QModelIndex();
 

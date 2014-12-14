@@ -13,6 +13,6 @@ public:
 public slots:
     void reload() { _tree->reload(); };
 private:
-    QVBoxLayout* _layout;
-    ScheduleTree* _tree;
+    QVBoxLayout* _layout{nullptr};
+    ScheduleTree* _tree{nullptr};
 };

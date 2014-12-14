@@ -39,7 +39,7 @@ public:
 public slots:
     void reload();
 private:
-    ScheduleItem* _root;
+    ScheduleItem* _root{nullptr};
 
     void _loadItems();
     QVariant _dataContent(ScheduleItem* item, int role) const;

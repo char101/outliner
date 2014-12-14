@@ -18,6 +18,6 @@ public slots:
         expandAll();
     }
 private:
-    ScheduleModel* _model;
-    ScheduleItemDelegate* _delegate;
+    ScheduleModel* _model{nullptr};
+    ScheduleItemDelegate* _delegate{nullptr};
 };

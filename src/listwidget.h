@@ -29,9 +29,9 @@ signals:
     void scheduleChanged();
     void operationError(const QString& message);
 private:
-    QVBoxLayout* _layout;
-    QSplitter* _splitter;
-    ListOutliner* _outliner;
-    QTabWidget* _tabWidget;
+    QVBoxLayout* _layout{nullptr};
+    QSplitter* _splitter{nullptr};
+    ListOutliner* _outliner{nullptr};
+    QTabWidget* _tabWidget{nullptr};
     QList<ListTree*> _trees;
 };

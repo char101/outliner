@@ -104,7 +104,11 @@ QModelIndex ScheduleModel::parent(const QModelIndex& index) const
     if (!index.isValid()) // root
         return QModelIndex();
 
-    ScheduleItem* parent = itemFromIndex(index)->parent();
+    ScheduleItem* item = itemFromIndex(index);
+    if (!item)
+        return QModelIndex();
+
+    ScheduleItem* parent = item->parent();
     if (!parent) // top level item
         return QModelIndex();
 

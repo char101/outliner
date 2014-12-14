@@ -15,7 +15,7 @@ public:
     ~ScheduleItem();
 
     int id() const { return _id; };
-    bool isRoot() const { return _type == ScheduleItem::Task; };
+    bool isRoot() const { return _type == ScheduleItem::Root; };
     bool isToday() const { return _type == ScheduleItem::Day && _dueDate == QDate::currentDate(); };
 
     QString content() const { return _content; };
@@ -41,13 +41,15 @@ public:
 
     enum Type { Year, Month, Day, Task, Root };
 private:
-    int _id;
+    int _id{0};
+    bool _isCheckable{false};
+    bool _isCompleted{false};
+    int _type{0};
+    int _row{0};
+
+    ScheduleItem* _parent{nullptr};
+
     QString _content;
     QDate _dueDate;
-    bool _isCheckable;
-    bool _isCompleted;
-    int _type;
-    int _row;
-    ScheduleItem* _parent;
     QList<ScheduleItem*> _children;
 };

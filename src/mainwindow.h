@@ -20,13 +20,13 @@ public slots:
     void showAboutDialog();
     void showAboutQtDialog();
 private:
-    bool _menuVisible;
-    bool _statusBarVisible;
+    bool _menuVisible{false};
+    bool _statusBarVisible{false};
 
-    QTabWidget* _tabs;
-    ListWidget* _list;
-    ScheduleWidget* _schedule;
-    QStatusBar* _statusBar;
+    QTabWidget* _tabs{nullptr};
+    ListWidget* _list{nullptr};
+    ScheduleWidget* _schedule{nullptr};
+    QStatusBar* _statusBar{nullptr};
 
     void _setupMenu();
     void _setupStatusBar();

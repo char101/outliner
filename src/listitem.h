@@ -24,7 +24,7 @@ public:
     ListModel* model() const { return _model; };
     void setModel(ListModel* model);
 
-    bool isRoot() const { return _id == 0; };
+    bool isRoot() const { return _isRoot; };
     bool sort(App::SortMode mode);
 
     int id() const { return _id; };
@@ -93,8 +93,9 @@ signals:
 private:
     ListModel* _model{nullptr};
 
+    bool _isRoot{false};
     int _listId{0};
-    int _id{0};
+    int _id{0}; // 0 means root
     int _row{0};
     int _priority{0};
 

@@ -24,7 +24,7 @@ public:
     void dropColumn(const QString& table, const QStringList& columns);
     void migrateTable(const QString& table, const QStringList& droppedColumns);
 private:
-    QString dbPath;
-    bool failed;
-    bool migrateTableInner(const QString& table, const QStringList& droppedColumns);
+    bool _failed{false};
+    QString _dbPath;
+    bool _migrateTableInner(const QString& table, const QStringList& droppedColumns);
 };
