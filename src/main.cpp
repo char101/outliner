@@ -43,7 +43,9 @@ int main(int argc, char *argv[])
         dbPath = args[0];
     else {
 #ifdef QT_DEBUG
-        dbPath = "Q:\\Outliner\\test.sqlite";
+        QString db1 = "Q:\\Outliner\\outline.sqlite";
+        QString db2 = "Q:\\Outliner\\test.sqlite";
+        dbPath = QFile::exists(db1) ? db1 : db2;
 #else
         dbPath = app.applicationDirPath() + "/" + "outline.sqlite";
 #endif
