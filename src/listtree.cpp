@@ -248,14 +248,19 @@ void ListTree::_moveVertical(int dir)
 {
     int offset = dir == App::Up ? -1 : 1;
 
+    QDEBUG << offset;
+
     QModelIndex curr = currentIndex();
+    QDEBUG << curr;
     if (!curr.isValid())
         return;
     QModelIndex next = curr.sibling(curr.row() + offset, curr.column());
+    QDEBUG << next;
     if (!next.isValid())
         return;
 
     QModelIndex newIndex = model()->moveItemVertical(curr, dir);
+    QDEBUG << newIndex;
     setCurrentIndex(newIndex);
 
     restoreExpandedState(newIndex);
@@ -305,7 +310,7 @@ void ListTree::_appendItem(App::AppendMode mode)
 
     QModelIndex newIndex;
     if (mode == App::AppendChild) {
-        newIndex = model->appendChild(idx, text);
+        newIndex = model->appendChild(idx, _newItemRow(idx), text);
         if (newIndex.isValid()) {
             // model->itemFromIndex(childIndex.parent())->setExpanded(true);
             // setExpanded(idx.parent(), true);
@@ -576,4 +581,29 @@ void ListTree::_showCompletedRows(ListItem* parent)
         else if (child->childCount() > 0)
             _showCompletedRows(child);
     }
+}
+
+int ListTree::_newItemRow(const QModelIndex& parent)
+{
+    Q_ASSERT(parent.isValid());
+
+    ListItem* item = model()->itemFromIndex(parent);
+    if (!item)
+        return 0;
+
+    int pos = item->childCount();
+    if (pos == 0)
+        return 0;
+
+    --pos;
+    ListItem* child = nullptr;
+    while (isRowHidden(pos, parent) || (child = item->child(pos), child->isCompleted() || child->isCancelled())) {
+        --pos;
+        if (pos < 0) // all child hidden
+            return 0;
+    }
+
+    QDEBUG << pos + 1;
+
+    return pos + 1;
 }

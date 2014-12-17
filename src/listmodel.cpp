@@ -304,33 +304,39 @@ QModelIndex ListModel::_appendAfter(ListItem* item, const QString& content, App:
     return indexFromItem(newItem);
 }
 
-QModelIndex ListModel::appendChild(const QModelIndex& index, QString content)
+QModelIndex ListModel::appendChild(const QModelIndex& parent, int row, QString content)
 {
-    if (index.isValid() && index.column() != 0)
+    if (parent.isValid() && parent.column() != 0)
         return QModelIndex();
 
-    ListItem* parent = itemFromIndex(index);
-    if (!parent)
+    ListItem* parentItem = itemFromIndex(parent);
+    if (!parentItem)
         return QModelIndex();
-
-    int row = parent->childCount();
 
     SqlQuery sql;
-    sql.prepare("INSERT INTO list_item (list_id, parent_id, weight, content, created_at) VALUES (:list, :parent, :weight, :content, CURRENT_TIMESTAMP)");
+
+    sql.prepare("UPDATE list_item SET weight = weight + 1 WHERE parent_id = :parent AND weight >= :row");
     sql.bindValue(":list", _listId);
-    sql.bindValue(":parent", parent->id());
-    sql.bindValue(":weight", row);
+    sql.bindValue(":parent", parentItem->id());
+    sql.bindValue(":row", row);
+    if (!sql.exec())
+        return QModelIndex();
+
+    sql.prepare("INSERT INTO list_item (list_id, parent_id, weight, content, created_at) VALUES (:list, :parent, :row, :content, CURRENT_TIMESTAMP)");
+    sql.bindValue(":list", _listId);
+    sql.bindValue(":parent", parentItem->id());
+    sql.bindValue(":row", row);
     sql.bindValue(":content", content);
     if (!sql.exec())
         return QModelIndex();
 
     int id = sql.lastInsertId().toInt();
 
-    beginInsertRows(indexFromItem(parent), row, row);
+    beginInsertRows(parent, row, row);
     ListItem* newItem = new ListItem(_listId, id, content);
-    if (isNewItemCheckable(parent))
+    if (isNewItemCheckable(parentItem, row))
         newItem->setCheckable(true);
-    parent->appendChild(newItem);
+    parentItem->insertChild(row, newItem);
     endInsertRows();
 
     return indexFromItem(newItem);
@@ -375,6 +381,7 @@ QModelIndex ListModel::moveItemVertical(const QModelIndex& index, int direction)
         return index;
 
     int row = item->row();
+    QDEBUG << row;
     if (direction == App::Up && row == 0)
         return index;
 
@@ -394,6 +401,7 @@ QModelIndex ListModel::moveItemVertical(const QModelIndex& index, int direction)
         if (beginMoveRows(index.parent(), downRow, downRow, index.parent(), downRow + 2)) {
             parent->moveChild(downRow);
             endMoveRows();
+            QDEBUG << item->row();
             return indexFromItem(item);
         }
     } else
@@ -519,7 +527,16 @@ void ListModel::itemChanged(ListItem* item, const QVector<int>& roles)
         emit projectChanged(item);
 }
 
-bool ListModel::isNewItemCheckable(ListItem* ref)
+bool ListModel::isNewItemCheckable(ListItem* parent, int row)
 {
-    return ref->isCheckable() || ref->isProject() || ref->isMilestone();
+    if (parent->isProject() || parent->isMilestone())
+        return true;
+
+    if (row > 0) {
+        ListItem* previous = parent->child(row - 1);
+        if (previous)
+            return previous->isCheckable();
+    }
+
+    return false;
 }

@@ -67,4 +67,5 @@ private:
     void _showCompletedRows(ListItem* parent = 0);
 
     void _drawPriorityBar(ListItem* item, QPainter* painter, const QRect& rect, int x, int gap = 0) const;
+    int _newItemRow(const QModelIndex& parent);
 };

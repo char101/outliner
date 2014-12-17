@@ -34,7 +34,7 @@ public:
     QModelIndex indexFromId(int itemId) const;
     ListItem* itemFromId(int itemId, ListItem* parent = 0) const;
 
-    QModelIndex appendChild(const QModelIndex& index, QString content);
+    QModelIndex appendChild(const QModelIndex& parent, int row, QString content);
     QModelIndex appendAfter(const QModelIndex& index, QString content, App::AppendMode mode = App::AppendAfter);
 
     void sort(ListItem* parent, App::SortMode mode);
@@ -45,7 +45,7 @@ public:
 
     void itemChanged(ListItem* item, const QVector<int>& roles = QVector<int>());
 
-    static bool isNewItemCheckable(ListItem* ref);
+    static bool isNewItemCheckable(ListItem* parent, int row = 0);
 signals:
     void projectAdded(ListItem* item);
     void projectChanged(ListItem* item);
