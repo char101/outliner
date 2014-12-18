@@ -1,6 +1,7 @@
 /build
 /3rdparty/hoedown
 /gh-pages
+/icons
 /misc
 Makefile*
 *.user
