@@ -170,12 +170,13 @@ QVariant ListModel::data(const QModelIndex& index, int role) const
 
 bool ListModel::setData(const QModelIndex& index, const QVariant& value, int role)
 {
-    qDebug() << QString("%0:%1 (%2)").arg(__FILE__).arg(__LINE__).arg(__FUNCTION__) << role;
     if (!index.isValid())
         return false;
+
     ListItem* item = itemFromIndex(index);
     if (!item)
         return false;
+
     if (index.column() == 0) {
         switch (role) {
             case Qt::CheckStateRole:
