@@ -38,7 +38,7 @@ public:
     QModelIndex appendAfter(const QModelIndex& index, QString content, App::AppendMode mode = App::AppendAfter);
 
     void sort(ListItem* parent, App::SortMode mode);
-    QModelIndex moveItemVertical(const QModelIndex& index, int direction);
+    QModelIndex moveItemVertical(const QModelIndex& index, App::Direction direction);
     QModelIndex moveItemHorizontal(const QModelIndex& index, int direction);
 
     void removeItem(const QModelIndex& index);

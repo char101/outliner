@@ -244,27 +244,37 @@ void ListTree::contextMenuEvent(QContextMenuEvent* event)
     }
 }
 
-void ListTree::_moveVertical(int dir)
+void ListTree::_moveVertical(App::Direction direction)
 {
-    int offset = dir == App::Up ? -1 : 1;
-
-    QDEBUG << offset;
+    int offset = direction == App::Up ? -1 : 1;
 
     QModelIndex curr = currentIndex();
-    QDEBUG << curr;
     if (!curr.isValid())
         return;
-    QModelIndex next = curr.sibling(curr.row() + offset, curr.column());
-    QDEBUG << next;
-    if (!next.isValid())
-        return;
 
-    QModelIndex newIndex = model()->moveItemVertical(curr, dir);
-    QDEBUG << newIndex;
+    ListModel* model = this->model();
+
+    QModelIndex parent = curr.parent();
+    int nchild = model->itemFromIndex(parent)->childCount();
+    int row = curr.row();
+    int newRow = row + offset;
+    while (isRowHidden(newRow, parent)) {
+        newRow += offset;
+        if (newRow == 0 || newRow == nchild) // all other rows are hidden
+            return;
+    }
+
+    QDEBUG << row << newRow;
+
+    QModelIndex newIndex;
+    while (row != newRow) {
+        newIndex = model->moveItemVertical(curr, direction);
+        QDEBUG << row << newIndex;
+        row += offset;
+    }
+
     setCurrentIndex(newIndex);
-
-    restoreExpandedState(newIndex);
-    restoreExpandedState(curr);
+    restoreExpandedState(parent);
 }
 
 void ListTree::_moveHorizontal(int dir)

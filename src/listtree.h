@@ -60,7 +60,7 @@ private:
     bool _isHidingCompleted{false};
 
     void _appendItem(App::AppendMode mode);
-    void _moveVertical(int dir);
+    void _moveVertical(App::Direction direction);
     void _moveHorizontal(int dir);
     bool _itemKeyPress(ListItem* item, int key, Qt::KeyboardModifiers modifiers);
     void _hideCompletedRows(ListItem* parent = 0);

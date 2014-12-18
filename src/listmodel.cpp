@@ -374,14 +374,13 @@ void ListModel::sort(ListItem* parent, App::SortMode mode)
     emit layoutChanged();
 }
 
-QModelIndex ListModel::moveItemVertical(const QModelIndex& index, int direction)
+QModelIndex ListModel::moveItemVertical(const QModelIndex& index, App::Direction direction)
 {
     ListItem* item = itemFromIndex(index);
     if (!item)
         return index;
 
     int row = item->row();
-    QDEBUG << row;
     if (direction == App::Up && row == 0)
         return index;
 
@@ -401,7 +400,6 @@ QModelIndex ListModel::moveItemVertical(const QModelIndex& index, int direction)
         if (beginMoveRows(index.parent(), downRow, downRow, index.parent(), downRow + 2)) {
             parent->moveChild(downRow);
             endMoveRows();
-            QDEBUG << item->row();
             return indexFromItem(item);
         }
     } else
