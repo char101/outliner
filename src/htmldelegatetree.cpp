@@ -38,8 +38,9 @@ QSize HtmlDelegateTree::sizeHint(const QStyleOptionViewItem& option, const QMode
     if (column == 0) {
         // indentation/arrows (only in column 0)
         int level = 1; // the top level items are already indented once
+        QModelIndex root = parent->rootIndex();
         QModelIndex curr = index.parent();
-        while (curr.isValid()) {
+        while (curr.isValid() && curr != root) {
             ++level;
             curr = curr.parent();
         }
