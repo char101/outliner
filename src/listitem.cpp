@@ -336,12 +336,16 @@ bool ListItem::setCheckable(const bool isCheckable)
 
 bool ListItem::setCompleted(const bool isCompleted)
 {
+    if (!_isCheckable || _isCancelled)
+        return false;
     return isCompleted == _isCompleted ||
            _setAttribute("is_completed", isCompleted ? 1 : 0) && (_isCompleted = isCompleted, true);
 }
 
 bool ListItem::setCancelled(const bool isCancelled)
 {
+    if (!_isCheckable || _isCompleted)
+        return false;
     return isCancelled == _isCancelled ||
            _setAttribute("is_cancelled", isCancelled) && (_isCancelled = isCancelled, true);
 }
