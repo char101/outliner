@@ -16,4 +16,8 @@ enum ItemState { CheckableState, CompletedState, CancelledState, ProjectState, H
 extern const QColor HighlightBackgroundColor;
 extern const QColor ProjectBackgroundColor;
 extern const QColor MilestoneBackgroundColor;
+
+extern const QColor CompletedColor;
+extern const QColor CancelledColor;
+extern const QColor NoteColor;
 }

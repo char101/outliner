@@ -13,4 +13,8 @@ namespace App
     const QColor HighlightBackgroundColor = _color("#F39C12", 128);
     const QColor ProjectBackgroundColor = _color("#3498DB", 32);
     const QColor MilestoneBackgroundColor = _color("#2ECC71", 32);
+
+    const QColor CancelledColor = QColor(182, 124, 124);
+    const QColor CompletedColor = QColor(Qt::gray);
+    const QColor NoteColor = _color("#666666");
 }

@@ -1,6 +1,7 @@
 #include "listitemdelegate.h"
 
 #include "listtree.h"
+#include "constants.h"
 
 ListItemDelegate::ListItemDelegate(ListTree* parent) : HtmlDelegateTree(parent) {}
 
@@ -15,9 +16,11 @@ QColor ListItemDelegate::textColor(const QModelIndex& index) const
 
     if (item) {
         if (item->isCompleted())
-            return QColor(Qt::gray);
+            return App::CompletedColor;
         if (item->isCancelled())
-            return QColor(182, 124, 124);
+            return App::CancelledColor;
+        if (!item->isCheckable() && !(item->isProject() || item->isMilestone()))
+            return App::NoteColor;
     }
 
     return QColor(Qt::black);
