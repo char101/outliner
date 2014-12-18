@@ -364,9 +364,20 @@ void ListTree::edit(const QModelIndex& index)
     if (!item)
         return;
 
+    QDate maxDueDate;
+    ListItem* parent = item->parent();
+    while (parent) {
+        if (!parent->dueDate().isNull()) {
+            maxDueDate = parent->dueDate();
+            break;
+        }
+        parent = parent->parent();
+    }
+
     ListItemEditDialog dialog(QApplication::activeWindow(), QStringLiteral("Edit Item %0").arg(item->id()));
     dialog.setText(item->markdown());
     dialog.setDueDate(item->dueDate());
+    dialog.setMaxDueDate(maxDueDate);
 
     if (dialog.exec() == QDialog::Accepted) {
         item->setMarkdown(dialog.text());
@@ -522,7 +533,12 @@ void ListTree::restoreExpandedState(ListItem* item)
 {
     if (!item)
         return;
-    setExpanded(model()->indexFromItem(item), item->isExpanded());
+
+QModelIndex index = model()->indexFromItem(item);
+    bool expanded = item->isExpanded();
+    if (isExpanded(index) != expanded)
+        setExpanded(index, expanded);
+
     for (int i = 0, n = item->childCount(); i < n; ++i) {
         restoreExpandedState(item->child(i));
     }

@@ -168,6 +168,11 @@ void ListItemEditDialog::setDueDate(QDate date)
     }
 }
 
+void ListItemEditDialog::setMaxDueDate(QDate maxDate)
+{
+    _dueDateEdit->setMaximumDate(maxDate);
+}
+
 bool ListItemEditDialog::_isSimpleText(const QString& text) const
 {
     return text.indexOf('\n') == -1 && text.indexOf('\r') == -1;

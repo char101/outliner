@@ -28,6 +28,7 @@ public:
 
     QDate dueDate() const;
     void setDueDate(QDate date);
+    void setMaxDueDate(QDate maxDate);
 private:
     QVBoxLayout* _layout;
     QTabWidget* _tabWidget;
