@@ -298,7 +298,7 @@ QModelIndex ListModel::_appendAfter(ListItem* item, const QString& content, App:
     beginInsertRows(indexFromItem(parent), row, row);
     ListItem* newItem = new ListItem(_listId, id, content);
     parent->insertChild(row, newItem);
-    if (isNewItemCheckable(item))
+    if (isNewItemCheckable(item->parent(), row))
         newItem->setCheckable(true);
     endInsertRows();
 
@@ -528,14 +528,12 @@ void ListModel::itemChanged(ListItem* item, const QVector<int>& roles)
 
 bool ListModel::isNewItemCheckable(ListItem* parent, int row)
 {
-    if (parent->isProject() || parent->isMilestone())
-        return true;
-
     if (row > 0) {
         ListItem* previous = parent->child(row - 1);
         if (previous)
             return previous->isCheckable();
-    }
+    } else
+        return parent->isProject() || parent->isMilestone();
 
     return false;
 }
