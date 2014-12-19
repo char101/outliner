@@ -486,16 +486,25 @@ void ListTree::drawBranches(QPainter *painter, const QRect &rect, const QModelIn
     if (!index.isValid() || index.column() != 0)
         return;
 
-    ListItem* item = model()->itemFromIndex(index);
-    if (item->isRoot())
+    ListItem* currItem = model()->itemFromIndex(index);
+    if (currItem->isRoot())
         return;
 
     ListItem* root = model()->itemFromIndex(rootIndex());
     const int width = rect.width();
-    const int nsteps = item->level() - root->level();
+    const int nsteps = currItem->level() - root->level();
     const int step = width / nsteps;
+    ListItem* item = currItem;
     for (int i = nsteps - 1; i >= 0; --i) {
-        _drawPriorityBar(item, painter, rect, step * i, i == nsteps - 1 ? 1 : 0);
+        int gap = 0;
+        if (i == nsteps - 1) {
+            if (currItem->childCount() == 0 || !currItem->isExpanded())
+                gap = 1;
+        } else if (i == nsteps - 2) {
+            if (currItem->isLastChild())
+                gap = 1;
+        }
+        _drawPriorityBar(item, painter, rect, step * i, gap);
         item = item->parent();
     }
 }
@@ -512,8 +521,11 @@ void ListTree::_drawPriorityBar(ListItem* item, QPainter* painter, const QRect& 
         default: return;
     }
 
+    // middle
     color.setAlpha(192);
     painter->fillRect(x + 1, rect.y(), 1, rect.height() - gap, color);
+
+    // left, right
     color.setAlpha(48);
     painter->fillRect(x, rect.y(), 1, rect.height() - gap, color);
     painter->fillRect(x + 2, rect.y(), 1, rect.height() - gap, color);

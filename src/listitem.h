@@ -47,6 +47,7 @@ public:
     void moveChild(int row);
     bool takeChildDb(int row);
     ListItem* takeChild(int row);
+    bool isLastChild() const { return _parent && _parent->childCount() == _row + 1; };
 
     int row() const { return _row; };
     bool setRow(int row);
