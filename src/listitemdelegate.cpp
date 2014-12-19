@@ -19,7 +19,7 @@ QColor ListItemDelegate::textColor(const QModelIndex& index) const
             return App::CompletedColor;
         if (item->isCancelled())
             return App::CancelledColor;
-        if (!item->isCheckable() && !(item->isProject() || item->isMilestone()))
+        if (!item->isCheckable() && !(item->isProject() || item->isMilestone() || item->isHighlighted() || item->childCount() > 0))
             return App::NoteColor;
     }
 
