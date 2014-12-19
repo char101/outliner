@@ -189,8 +189,6 @@ void ListWidget::toggleHideCompleted()
     else
         tree->hideCompleted();
 
-    QDEBUG << isHidden;
-
     QAction* menuItem = dynamic_cast<QAction*>(sender());
     if (menuItem && menuItem->isCheckable())
         menuItem->setChecked(isHidden ? false : true);
