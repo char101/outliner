@@ -515,9 +515,9 @@ void ListTree::_drawPriorityBar(ListItem* item, QPainter* painter, const QRect& 
 
     QColor color;
     switch (priority) {
-        case 1: color = QColor(192, 57, 43); break;
-        case 2: color = QColor(243, 156, 18); break;
-        case 3: color = QColor(39, 174, 96); break;
+        case 1: color = App::Priority1Color; break;
+        case 2: color = App::Priority2Color; break;
+        case 3: color = App::Priority3Color; break;
         default: return;
     }
 
