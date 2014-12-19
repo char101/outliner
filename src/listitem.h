@@ -48,6 +48,7 @@ public:
     bool takeChildDb(int row);
     ListItem* takeChild(int row);
     bool isLastChild() const { return _parent && _parent->childCount() == _row + 1; };
+    bool isNote() const { return !_isCheckable && !_isProject && !_isMilestone && !_isHighlighted && _children.length() == 0; };
 
     int row() const { return _row; };
     bool setRow(int row);

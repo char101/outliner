@@ -151,6 +151,8 @@ QVariant ListModel::data(const QModelIndex& index, int role) const
                                 return Util::findIcon("project");
                             if (item->isMilestone())
                                 return Util::findIcon("milestone");
+                            if (item->isNote())
+                                return Util::findIcon("note");
                             break;
 #ifdef QT_DEBUG
                         case Qt::ToolTipRole:

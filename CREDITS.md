@@ -10,3 +10,6 @@ License: [Creative Commons (Attribution 3.0 Unported)](http://creativecommons.or
 
 ### [Google material icons](https://github.com/google/material-design-icons)
 License: [Attribution 4.0 International](http://creativecommons.org/licenses/by/4.0/)
+
+### [breeze](https://github.com/NitruxSA/plasma-next-icons)
+License: [GNU GPL 3](https://github.com/NitruxSA/plasma-next-icons/blob/master/LICENSE)

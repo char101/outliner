@@ -11,6 +11,7 @@
 
    <file>project.png</file>
    <file>milestone.png</file>
+   <file>note.png</file>
 
    <file alias="CREDITS.md">../CREDITS.md</file>
   </qresource>
