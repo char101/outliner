@@ -23,9 +23,9 @@ MainWindow::MainWindow() : QMainWindow()
     _statusBarVisible = true;
 
 #ifdef QT_DEBUG
-    setWindowTitle("Taskware [DEBUG]");
+    setWindowTitle("Task Manager [DEBUG]");
 #else
-    setWindowTitle("Taskware");
+    setWindowTitle("Task Manager");
 #endif
 
     setWindowIcon(Util::findIcon("app", QList<int>{16}));

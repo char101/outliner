@@ -1,5 +1,5 @@
 TEMPLATE = app
-TARGET = outliner
+TARGET = taskmngr
 CONFIG += c++11
 RC_FILE = res/app.rc
 RESOURCES = res/app.qrc
