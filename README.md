@@ -1,4 +1,4 @@
-Taskware
+Task Manager
 ================
 
 Currently a simple task outliner.
